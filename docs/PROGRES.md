@@ -29,8 +29,14 @@ Formatnya:
   - **Uji pintu staging dari luar, tanpa login:** halaman `/saklar` 200; daftar pengguna dan config tanpa login 401; token karangan dan kata ajaib lama ditolak di ketiga rumah; simpan config dengan kata ajaib lama 400.
   - Dengan kunci rahasia, fungsi `_<rumah>_admin_daftar_user_internal` menjawab (SUM 56, KMB TRA 41, KMB Project 24 pengguna).
   - **Temuan jaringan:** DNS internet di komputer kerja (14 Nov) membelokkan `*.workers.dev` ke IP AWS, sehingga staging tidak bisa dibuka; `abadiops.com` tidak terkena. Pengguna dengan operator yang sama juga tidak bisa membuka staging. Ini menambah alasan staging butuh domain `abadiops.com` sendiri (#28). Uji dilakukan dengan alamat dari DNS Cloudflare.
+  - **Sandi panel staging diganti** (atas persetujuan Gabriel). Sandinya ada di `abadiops.env` (`PANEL_SAKLAR_SANDI_STAGING`); yang dipasang di Worker hanya sidik SHA-256-nya. Panel produksi tidak berubah.
+  - **Uji dengan sesi panel yang sah** (pintu staging `983e0d20`):
+    - sandi salah 401, sandi baru diterima;
+    - menu Pengguna lewat fungsi `_internal`: KMB Project 24, SUM 56, KMB TRA 41 pengguna;
+    - menu Config: KMB Project, SUM, dan KMB TRA semuanya terbaca dari Supabase.
+  - Config KMB TRA sempat gagal karena `kmb.config_jobs_field` tidak ada di Gedung 2 (sisa bug #29). Dulu kegagalan ini tertutup data rekaan. Sheet itu disalin ke Gedung 2 dengan `tools/cermin/sinkron.mjs --skema=kmb --sheet=Config_Jobs_Field` (1.548 baris, sidik sama dengan Gedung 1). Sheet lain sengaja tidak disalin, karena tabel cermin `kmb.work_orders` di Gedung 2 berisi WO uji staging (butir 1).
+  - Galat RPC di panel sekarang memakai pesan asli PostgREST. Hanya `PGRST202` yang dilaporkan sebagai "belum terpasang"; dulu setiap 404 (termasuk tabel yang tidak ada) disebut begitu.
 - Belum selesai / berikutnya:
-  - Uji menu pengguna dan config di panel staging dengan sesi panel yang sah (login sandi panel staging).
   - Daftar gabungan pengguna/config ketiga rumah melaporkan `success=true` walaupun ketiganya gagal (`adaSukses || daftarTarget.length > 1`).
   - Aplikasi rumah staging: `admin_simpan_user` mengirim `p_user`, padahal fungsi SQL meminta `p_op_id` dan `p_payload`; `*_admin_set_token_status_bertoken` tidak ada di SQL. Sekarang jalur itu jatuh ke GAS tiruan.
   - Pintu staging dengan binding `GAS_TIRUAN` masih punya jalur token `uji-palsu-spt-<rumah>` kalau `USE_GAS_TIRUAN_ADMIN=true`. Sekarang tidak aktif; dibuang sebelum merge ke `main`.

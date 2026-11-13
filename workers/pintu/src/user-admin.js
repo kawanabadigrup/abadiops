@@ -285,8 +285,9 @@ export async function panggilRpcAdminRumah({
 
     if (!res.ok) {
       const errText = await res.text();
-      // JIKA RPC BELUM TERPASANG DI SCHEMA CACHE SUPABASE (HTTP 404 / PGRST202):
-      if (res.status === 404 || errText.includes('PGRST202')) {
+      // PGRST202: fungsinya memang belum ada. Galat lain, misalnya tabel yang dirujuk fungsi belum ada
+      // (juga dijawab HTTP 404), dilaporkan dengan pesan aslinya di bawah supaya penyebabnya terlihat.
+      if (errText.includes('PGRST202')) {
         return { success: false, error: `RPC ${rpcName} belum terpasang di Supabase rumah ini.` };
       }
       return {
