@@ -12,6 +12,23 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (laporan selisih harian cermin)
+- Berubah:
+  - **`tools/cermin/sinkron.mjs --periksa`:**
+    - setiap sheet dimuat ulang ke tabel sementara walaupun tidak berubah, lalu seluruh isi tabel cermin dibandingkan dengan isi sheet **di dalam database**: `nilai` dan `data` per baris, termasuk baris yang hilang atau berlebih. Yang keluar dari database hanya angka selisih, jadi tidak memakan jatah egress;
+    - selisih yang tersisa sesudah ditulis membuat sheet itu GAGAL. Workflow jadi merah dan GitHub mengirim surel;
+    - hasilnya dicatat di `cermin_log.selisih` dan `cermin_meta` (`periksa_terakhir`, `periksa_hasil`, `hari_tanpa_selisih`);
+    - `hari_tanpa_selisih` menghitung hari WIB berturut-turut sampai hari ini yang punya pemeriksaan, tanpa selisih, dan tanpa sinkron gagal.
+  - **`--periksa=harian`:** sekali per hari kalender WIB per rumah, mulai pukul 02.00 WIB. Workflow `cermin` tiap jam memakainya. Kalau dijalankan manual, ada pilihan "periksa" untuk memeriksa sekarang juga.
+  - **Uji:**
+    - kueri selisih menangkap baris yang berubah, hilang, dan berlebih (0, lalu 2, lalu 3, di dalam transaksi yang dibatalkan);
+    - pemeriksaan BUPR: 23 dari 23 sheet sama.
+  - `docs/SAKLAR.md`: tempat melihat laporan, dan ukuran syarat 7 hari.
+- Belum selesai / berikutnya:
+  - Syarat "7 hari tanpa selisih" paling cepat terpenuhi 20 Nov (14–20 Nov), kalau setiap hari bersih.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin per baris; jadwal tiap jam di GitHub Actions)
 - Berubah:
   - **Sinkron per baris** (`tools/cermin/sinkron.mjs`):

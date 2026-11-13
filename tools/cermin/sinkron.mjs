@@ -32,6 +32,12 @@
  *   --kering                 baca dan hitung saja, tanpa menulis ke database
  *   --ringkas                satu baris per rumah, tanpa judul spreadsheet, ID, atau nama sheet yang lulus.
  *                            Dipakai di GitHub Actions, karena log repo publik bisa dibaca siapa saja.
+ *   --periksa                laporan selisih: setiap sheet dimuat ulang walaupun tidak berubah, lalu SELURUH isi
+ *                            tabel dibandingkan dengan isi sheet di dalam database (tanpa menarik data keluar).
+ *                            Selisih yang tersisa sesudah ditulis berarti ada yang salah, dan sheet itu GAGAL.
+ *   --periksa=harian         sama, tapi hanya sekali per hari kalender WIB per rumah, mulai pukul 02.00 WIB.
+ *                            Hasilnya di cermin_log.selisih dan cermin_meta (periksa_terakhir, periksa_hasil,
+ *                            hari_tanpa_selisih), bahan syarat saklar "7 hari tanpa selisih" (docs/SAKLAR.md).
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -77,6 +83,12 @@ const keTabel = (sheet) => sheet
   .toLowerCase();
 
 const ident = (s) => `"${String(s).replace(/"/g, '""')}"`;
+
+// Tanggal dan jam WIB (UTC+7, tanpa musim panas).
+const wib = (d) => {
+  const w = new Date(d.getTime() + 7 * 3600e3);
+  return { tanggal: w.toISOString().slice(0, 10), jam: w.getUTCHours() };
+};
 
 // ── Login akun layanan Google (JWT RS256), cakupan baca-saja ─────────────────
 async function aksesToken(keyFile) {
@@ -233,10 +245,11 @@ async function siapkanSkema(sql, skema) {
     sidik        text,
     galat        text
   )`;
-  // Jumlah baris yang ditulis dan dihapus di setiap putaran, bahan laporan selisih harian.
+  // Jumlah baris yang ditulis dan dihapus di setiap putaran, dan hasil --periksa (null kalau tidak diperiksa).
   await sql`ALTER TABLE ${sql(skema + '.cermin_log')}
               ADD COLUMN IF NOT EXISTS baris_berubah integer,
-              ADD COLUMN IF NOT EXISTS baris_dihapus integer`;
+              ADD COLUMN IF NOT EXISTS baris_dihapus integer,
+              ADD COLUMN IF NOT EXISTS selisih integer`;
   // Cermin hanya dibaca Worker lewat RPC bertoken. Pengguna anonim tidak boleh masuk skema ini.
   await sql`REVOKE ALL ON SCHEMA ${sql(skema)} FROM anon, authenticated`;
 }
@@ -259,13 +272,16 @@ async function siapkanTabel(tx, skema, tabel, headers) {
   }
 }
 
-// Tulis satu sheet per baris. Hasilnya { sama } kalau isinya tidak berubah, atau jumlah baris yang ditulis dan dihapus.
-async function tulisSheet(tx, skema, tabel, judul, headers, rows, sidik) {
+// Tulis satu sheet per baris. `sama` berarti isinya tidak berubah sejak sinkron sebelumnya; tanpa `periksa`,
+// sheet seperti itu tidak disentuh. Dengan `periksa`, seluruh isi tabel sesudah ditulis dibandingkan dengan isi
+// sheet di dalam database; `selisih` adalah jumlah baris yang masih berbeda, dan seharusnya 0.
+async function tulisSheet(tx, skema, tabel, judul, headers, rows, sidik, periksa) {
   const nama = `${skema}.${tabel}`;
   await siapkanTabel(tx, skema, tabel, headers);
   const lalu = await tx`SELECT sidik FROM ${tx(skema + '.cermin_header')} WHERE sheet = ${judul}`;
   const ada = (await tx`SELECT count(*)::int AS n FROM ${tx(nama)}`)[0].n;
-  if (lalu.length > 0 && lalu[0].sidik === sidik && ada === rows.length) return { sama: true, berubah: 0, dihapus: 0 };
+  const sama = lalu.length > 0 && lalu[0].sidik === sidik && ada === rows.length;
+  if (sama && !periksa) return { sama, berubah: 0, dihapus: 0, selisih: null };
 
   await tx`CREATE TEMP TABLE cermin_baru (baris integer PRIMARY KEY, nilai jsonb NOT NULL, data jsonb NOT NULL) ON COMMIT DROP`;
   for (let i = 0; i < rows.length; i += BARIS_PER_INSERT) {
@@ -278,7 +294,36 @@ async function tulisSheet(tx, skema, tabel, judul, headers, rows, sidik) {
     INSERT INTO ${tx(nama)} AS t (baris, nilai, data) SELECT baris, nilai, data FROM cermin_baru
     ON CONFLICT (baris) DO UPDATE SET nilai = EXCLUDED.nilai, data = EXCLUDED.data, sinkron_at = now()
     WHERE t.nilai IS DISTINCT FROM EXCLUDED.nilai OR t.data IS DISTINCT FROM EXCLUDED.data`;
-  return { sama: false, berubah: tulis.count, dihapus: hapus.count };
+  let selisih = null;
+  if (periksa) {
+    selisih = (await tx`
+      SELECT count(*)::int AS n FROM cermin_baru b FULL JOIN ${tx(nama)} t ON t.baris = b.baris
+      WHERE b.baris IS NULL OR t.baris IS NULL OR b.nilai IS DISTINCT FROM t.nilai OR b.data IS DISTINCT FROM t.data`)[0].n;
+  }
+  return { sama, berubah: tulis.count, dihapus: hapus.count, selisih };
+}
+
+// --periksa selalu memeriksa. --periksa=harian hanya kalau rumah ini belum diperiksa pada hari WIB ini,
+// dan baru mulai pukul 02.00 WIB.
+async function perluPeriksa(sql, skema) {
+  if (arg.periksa === true) return true;
+  if (arg.periksa !== 'harian') return false;
+  const sekarang = wib(new Date());
+  if (sekarang.jam < 2) return false;
+  const lalu = await sql`SELECT nilai FROM ${sql(skema + '.cermin_meta')} WHERE kunci = 'periksa_terakhir'`;
+  return lalu.length === 0 || wib(new Date(lalu[0].nilai)).tanggal < sekarang.tanggal;
+}
+
+// Hari berturut-turut (WIB) sampai hari ini yang bersih: ada pemeriksaan, tidak ada selisih,
+// dan tidak ada sinkron yang gagal pada hari itu.
+function hitungBeruntun(hari) {
+  const peta = new Map(hari.map((x) => [x.h, x]));
+  let n = 0;
+  for (let d = new Date(); ; d = new Date(d.getTime() - 86400e3)) {
+    const x = peta.get(wib(d).tanggal);
+    if (!x || x.diperiksa === 0 || x.beda > 0 || x.gagal > 0) return n;
+    n++;
+  }
 }
 
 // ── Satu rumah ───────────────────────────────────────────────────────────────
@@ -303,11 +348,13 @@ async function sinkronRumah(skema) {
   const kembar = new Set(semua.map((s) => s.tabel).filter((t, i, a) => a.indexOf(t) !== i));
 
   let sql = null;
+  let periksa = false;
   if (!kering) {
     const { default: postgres } = await import('postgres');
     sql = postgres(wajib('DATABASE_URL'), { max: 1, prepare: false, ssl: 'require', connect_timeout: 20, onnotice: () => {} });
     try {
       await siapkanSkema(sql, skema);
+      periksa = await perluPeriksa(sql, skema);
     } catch (e) {
       await sql.end({ timeout: 5 }).catch(() => {});
       throw e;
@@ -315,7 +362,7 @@ async function sinkronRumah(skema) {
   }
 
   const hasil = [];
-  const jumlah = { sama: 0, berubah: 0, dihapus: 0 };
+  const jumlah = { sama: 0, berubah: 0, dihapus: 0, diperiksa: 0, cocok: 0 };
   for (const { judul, grid, tabel } of target) {
     const mulaiAt = new Date();
     if (lewati.has(judul)) { hasil.push([judul, '-', 'dilewati (--lewati)']); continue; }
@@ -329,22 +376,30 @@ async function sinkronRumah(skema) {
       let tulis = null;
       if (!kering) {
         await sql.begin(async (tx) => {
-          tulis = await tulisSheet(tx, skema, tabel, judul, headers, rows, sidik);
+          tulis = await tulisSheet(tx, skema, tabel, judul, headers, rows, sidik, periksa);
           await tx`
             INSERT INTO ${tx(skema + '.cermin_header')} (sheet, tabel, headers, tipe, jumlah_baris, sidik, sinkron_at)
             VALUES (${judul}, ${tabel}, ${headers}, ${tx.json(tipe)}, ${rows.length}, ${sidik}, now())
             ON CONFLICT (sheet) DO UPDATE SET tabel = EXCLUDED.tabel, headers = EXCLUDED.headers,
               tipe = EXCLUDED.tipe, jumlah_baris = EXCLUDED.jumlah_baris, sidik = EXCLUDED.sidik,
               sinkron_at = EXCLUDED.sinkron_at`;
-          await tx`INSERT INTO ${tx(skema + '.cermin_log')} (sheet, mulai_at, jumlah_baris, sidik, baris_berubah, baris_dihapus)
-                   VALUES (${judul}, ${mulaiAt}, ${rows.length}, ${sidik}, ${tulis.berubah}, ${tulis.dihapus})`;
+          await tx`INSERT INTO ${tx(skema + '.cermin_log')} (sheet, mulai_at, jumlah_baris, sidik, baris_berubah, baris_dihapus, selisih)
+                   VALUES (${judul}, ${mulaiAt}, ${rows.length}, ${sidik}, ${tulis.berubah}, ${tulis.dihapus}, ${tulis.selisih})`;
         });
         if (tulis.sama) jumlah.sama++;
         jumlah.berubah += tulis.berubah;
         jumlah.dihapus += tulis.dihapus;
+        if (periksa) {
+          jumlah.diperiksa++;
+          if (tulis.selisih === 0) jumlah.cocok++;
+        }
+      }
+      if (tulis && tulis.selisih > 0) {
+        hasil.push([judul, String(rows.length), `GAGAL: ${tulis.selisih} baris tabel ${tabel} masih berbeda dengan sheet sesudah ditulis`]);
+        continue;
       }
       const campur = Object.entries(tipe).filter(([, t]) => t.startsWith('campur')).map(([h]) => h);
-      const tulisan = !tulis ? '' : tulis.sama ? ' · tidak berubah' : ` · ${tulis.berubah} baris ditulis, ${tulis.dihapus} dihapus`;
+      const tulisan = !tulis ? '' : `${tulis.sama ? ' · tidak berubah' : ` · ${tulis.berubah} baris ditulis, ${tulis.dihapus} dihapus`}${periksa ? ' · selisih 0' : ''}`;
       hasil.push([judul, String(rows.length), `${tabel} · ${headers.length} kolom · sidik ${sidik.slice(0, 12)}${tulisan}${campur.length ? ` · tipe campur: ${campur.join(', ')}` : ''}`]);
     } catch (e) {
       hasil.push([judul, '-', `GAGAL: ${e.message}`]);
@@ -353,11 +408,23 @@ async function sinkronRumah(skema) {
   }
 
   const gagal = hasil.filter(([, , ket]) => ket.startsWith('GAGAL'));
+  let beruntun = null;
   if (sql) {
-    // `sinkron_terakhir` hanya dicatat kalau putaran penuh dan tidak ada sheet yang gagal.
+    // `sinkron_terakhir` dan `periksa_terakhir` hanya dicatat kalau putaran penuh dan tidak ada sheet yang gagal.
     const isiMeta = [['spreadsheet_id', id], ['judul', meta.properties.title], ['zona_waktu', zona], ['sheet_dilewati', [...lewati].join(',')]];
     if (!arg.sheet && gagal.length === 0) isiMeta.push(['sinkron_terakhir', new Date().toISOString()]);
     try {
+      if (periksa) {
+        const hari = await sql`
+          SELECT to_char(mulai_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS h,
+                 count(*) FILTER (WHERE selisih IS NOT NULL)::int AS diperiksa,
+                 count(*) FILTER (WHERE selisih > 0)::int AS beda,
+                 count(*) FILTER (WHERE galat IS NOT NULL)::int AS gagal
+          FROM ${sql(skema + '.cermin_log')} GROUP BY 1`;
+        beruntun = hitungBeruntun(hari);
+        isiMeta.push(['periksa_hasil', `${jumlah.cocok}/${jumlah.diperiksa} sama`], ['hari_tanpa_selisih', String(beruntun)]);
+        if (!arg.sheet && gagal.length === 0) isiMeta.push(['periksa_terakhir', new Date().toISOString()]);
+      }
       for (const [k, v] of isiMeta) {
         await sql`INSERT INTO ${sql(skema + '.cermin_meta')} (kunci, nilai, diubah_at) VALUES (${k}, ${v}, now())
                   ON CONFLICT (kunci) DO UPDATE SET nilai = EXCLUDED.nilai, diubah_at = now()`;
@@ -374,11 +441,13 @@ async function sinkronRumah(skema) {
   if (arg.ringkas) {
     const disalin = hasil.length - gagal.length - hasil.filter(([, , ket]) => ket.startsWith('dilewati')).length;
     const tulisan = kering ? 'kering' : `${jumlah.sama} tidak berubah, ${jumlah.berubah} baris ditulis, ${jumlah.dihapus} dihapus`;
-    console.log(`${skema}: ${disalin} sheet lulus, ${gagal.length} gagal · ${tulisan}`);
+    const periksaan = periksa ? ` · diperiksa ${jumlah.cocok}/${jumlah.diperiksa} sama, ${beruntun ?? '?'} hari berturut-turut tanpa selisih` : '';
+    console.log(`${skema}: ${disalin} sheet lulus, ${gagal.length} gagal · ${tulisan}${periksaan}`);
     for (const [s, , ket] of gagal) console.log(`  GAGAL ${s}: ${samarkan(ket.replace(/^GAGAL: /, ''))}`);
   } else {
     console.log(`\n${kering ? 'MODE KERING, tidak ada yang ditulis ke database' : `Tersimpan ke skema ${skema}`}:`);
     for (const [s, n, ket] of hasil) console.log(`  ${s.padEnd(26)} ${n.padStart(7)}  ${ket}`);
+    if (periksa) console.log(`Diperiksa: ${jumlah.cocok}/${jumlah.diperiksa} sheet sama persis dengan tabelnya; ${beruntun ?? '?'} hari berturut-turut tanpa selisih.`);
   }
   return gagal.length === 0;
 }

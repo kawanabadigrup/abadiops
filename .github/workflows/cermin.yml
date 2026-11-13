@@ -13,14 +13,23 @@ name: Cermin
 #   CERMIN_RUMAH          satu baris per rumah: <SKEMA>_SPREADSHEET_ID=<id>. Rumah baru cukup
 #                         ditambah satu baris di sini, tanpa mengubah kode.
 #
+# Laporan selisih harian: sekali sehari per rumah (putaran pertama mulai 02.00 WIB), seluruh isi
+# setiap tabel dibandingkan dengan sheet yang baru dibaca, di dalam database. Hasilnya di
+# <skema>.cermin_meta (periksa_hasil, hari_tanpa_selisih) untuk syarat saklar "7 hari tanpa selisih".
+#
 # Repo ini publik, jadi log Actions bisa dibaca siapa saja. Karena itu alat dijalankan dengan
-# --ringkas: tanpa judul spreadsheet, ID, atau isi data. Workflow yang gagal mengirim surel
-# ke pemilik repo; itulah pemberitahuannya.
+# --ringkas: tanpa judul spreadsheet, ID, atau isi data. Workflow yang gagal, termasuk karena
+# ada selisih, mengirim surel ke pemilik repo; itulah pemberitahuannya.
 
 on:
   schedule:
     - cron: '41 * * * *'    # tiap jam, menit ke-41, menjauhi antrean awal jam
   workflow_dispatch:        # supaya bisa dijalankan sekarang, tanpa menunggu
+    inputs:
+      periksa:
+        description: 'Periksa selisih seluruh tabel sekarang juga (otomatis sekali sehari mulai 02.00 WIB)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -50,6 +59,7 @@ jobs:
           GOOGLE_SA_KEY_JSON: ${{ secrets.GOOGLE_SA_KEY_JSON }}
           DATABASE_URL: ${{ secrets.CERMIN_DATABASE_URL }}
           CERMIN_RUMAH: ${{ secrets.CERMIN_RUMAH }}
+          PERIKSA_SEKARANG: ${{ inputs.periksa }}
         run: |
           if [ -z "$GOOGLE_SA_KEY_JSON" ] || [ -z "$DATABASE_URL" ] || [ -z "$CERMIN_RUMAH" ]; then
             echo "::error::Rahasia GOOGLE_SA_KEY_JSON, CERMIN_DATABASE_URL, atau CERMIN_RUMAH belum diisi."
@@ -67,4 +77,6 @@ jobs:
               export "$kunci=$nilai"
             fi
           done <<< "$CERMIN_RUMAH"
-          node tools/cermin/sinkron.mjs --semua --ringkas
+          PERIKSA="--periksa=harian"
+          if [ "$PERIKSA_SEKARANG" = "true" ]; then PERIKSA="--periksa"; fi
+          node tools/cermin/sinkron.mjs --semua --ringkas "$PERIKSA"
