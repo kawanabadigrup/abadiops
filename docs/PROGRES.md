@@ -12,6 +12,27 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (Gedung 2: isi diperiksa, celah admin ditutup)
+- Berubah:
+  - `DATABASE_URL_GEDUNG2` terisi, setelah sandi database Gedung 2 di-reset. Nama proyek Supabase-nya "Stagging".
+  - **Isi Gedung 2** (dibaca 13 Nov):
+    - Ukurannya 342 MB dari batas 500 MB. Ini sumber angka 374 MB di halaman organisasi.
+    - Isinya cermin produksi yang lengkap: `sum` 202 MB dan `kmb` 126 MB. Tabel terbesar `audit_logs` (±50 MB per rumah) dan `work_orders_archive`.
+    - Token terakhir disinkron 10 Nov: `sum.api_tokens` 63 baris, `kmb.api_tokens` 46 baris.
+    - Cermin produksi ada di staging, tapi tidak di Gedung 1. Data ini salinan asli, jadi dijaga serahasia produksi.
+  - **Celah admin ditutup:** `EXECUTE` pada 30 fungsi `*_admin_*_bertoken` dicabut dari `PUBLIC`, `anon`, dan `authenticated`. Data dan isi fungsi tidak diubah. Uji dari luar dengan kata ajaib sekarang dijawab 401.
+  - **Jejak pemakaian** (tanpa data pemanggil):
+    - `pg_stat_statements` mencatat sekitar 215 panggilan `*_admin_daftar_user_bertoken`, plus beberapa simpan/set-status;
+    - `kmb_projek.processed_ops` mencatat 5 aksi admin, 9–11 Nov;
+    - log API Supabase paket gratis hanya menyimpan 1 hari, jadi pemanggil dari luar tidak bisa dipastikan.
+  - Keputusan Gabriel: kerja Raka **dilanjutkan** di branch `staging` dan Gedung 2 (`docs/KEPUTUSAN.md`; `AGENTS.md` butir 16 disesuaikan).
+- Belum selesai / berikutnya:
+  - Panel admin pengguna dan config di `/saklar` staging berhenti sampai otorisasinya diganti, dari kata ajaib menjadi sesi panel yang diperiksa di Worker dengan kunci rahasia.
+  - Lanjutkan daftar wajib-perbaiki di entri serah-terima 13 Nov, mulai dari keamanan.
+  - Ukuran Gedung 2 perlu diawasi (68% dari batas). Kandidat pengecilan: `audit_logs` cermin.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (penjaga gedung: Supabase tidak dijeda lagi)
 - Berubah:
   - Gedung 1 (`sptgqsjgszwbreikxdph`) NXDOMAIN sejak sebelum 13 Nov. Kemungkinan dijeda Supabase karena 7 hari tanpa aktivitas, sebab selama saklar `gas` tidak ada yang memanggilnya dan `pantau.yml` terjadwal dimatikan 29 Okt.
@@ -79,7 +100,7 @@ Formatnya:
        - `tentukanUrlPintu` selalu memilih pintu staging (`|| true`), jadi rumah produksi tanpa binding akan menulis ke staging.
        - Isinya disimpan di SaklarDO tanpa batas umur.
     6. **Monitoring SUM membocorkan token.** Token semua mekanik ikut dikirim tanpa cek peran, padahal GAS membatasinya untuk L1/L2.
-    7. **Celah otorisasi di fungsi admin SQL staging (Gedung 2).** Detailnya tidak ditulis di repo publik sampai celah ditutup.
+    7. **Celah otorisasi di fungsi admin SQL staging (Gedung 2).** Fungsi `_validasi_admin_token` menerima teks tetap `__PANEL_SAKLAR_PUSAT__` sebagai admin, dan fungsi `*_admin_*_bertoken` dibuka untuk `anon`. **Ditutup 13 Nov** (lihat entri Gedung 2 di atas). Kata ajaib itu masih harus dibuang dari kode.
     8. **Saklar dan asal WO belum benar.** Saklar KMB TRA dibaca dengan kunci `kmb`, padahal panel memakai `kmbtra` (#27 belum beres untuk KMB TRA). Asal WO ditebak dari jumlah digit, bukan dari awalan seperti di `docs/SAKLAR.md`.
     9. **Uji belum membuktikan fungsi.** Uji Raka (40/40, 27/27, 24/24) sebagian besar hanya mencari teks di berkas. CI tidak jalan di `staging`, dan tidak ada PR.
     10. **Konfigurasi produksi ikut diubah.** Di `wrangler.toml`, pintu produksi diberi Gedung 1 dan KMB Project produksi diberi binding pintu.

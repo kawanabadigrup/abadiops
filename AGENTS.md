@@ -95,8 +95,8 @@ Cara kerja yang terbukti 28–29 Okt 2026. Ikuti seperti aturan, bukan saran.
     - Jangan mengarahkan pengguna produksi ke fitur baru sebelum bukti itu ada.
     - Pelajaran 30 Okt: bug #24–#27.
 16. **Kerja Raka sudah diserahkan ke Gabriel (+ Claude)** (keputusan Gabriel, 13 Nov). Izin staging 2 Nov tidak berlaku lagi.
-    - Branch `staging` dan tag `raka-akhir-2026-11-11` adalah arsip kerja Raka sampai 11 Nov (`3e55ca8`). Jangan di-merge ke `main` apa adanya.
-    - Pindahkan bagian yang benar satu per satu ke `main`, masing-masing dengan bukti fungsi (butir 15). Daftar isi dan yang wajib diperbaiki: `docs/PROGRES.md`, entri 13 Nov.
+    - Tag `raka-akhir-2026-11-11` (`3e55ca8`) menyimpan kerja Raka apa adanya.
+    - Branch `staging` dilanjutkan Gabriel (+ Claude) di Gedung 2. Ia baru boleh di-merge ke `main` setelah lulus uji fungsi (butir 15). Yang wajib diperbaiki lebih dulu ada di `docs/PROGRES.md`, entri 13 Nov.
     - Jangan ikut menyalin:
       - berkas `docs/panduan_deploy_staging_kamis*.md`;
       - data rekaan di `workers/pintu/src/user-admin.js`;
