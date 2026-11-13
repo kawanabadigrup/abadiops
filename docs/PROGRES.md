@@ -12,6 +12,55 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (serah-terima kerja Raka; audit staging 2–11 Nov)
+- Berubah:
+  - Kerja Raka disimpan di repo ini:
+    - branch `staging` dimajukan ke `3e55ca8`, termasuk 21 commit yang sebelumnya hanya ada di fork `hrmarsa17/MAR-PROJECT`;
+    - tag `raka-akhir-2026-11-11`.
+  - Keputusan dicatat di `docs/KEPUTUSAN.md` (13 Nov), dan butir 16 `AGENTS.md` diganti.
+  - Isi staging: 80 commit sejak `main`, 89 berkas, +145.889 baris. Dari situ, 16 berkas `docs/panduan_deploy_staging_kamis*.md` (117.499 baris) adalah keluaran chat AI, bukan kode.
+  - **Produksi tidak tersentuh** (dicek 13 Nov):
+    - `main` tetap `3382c32`, dan saklar produksi semua `gas`.
+    - Pintu produksi tidak punya rute baru Raka (404).
+    - Login pintu dengan tiga token uji berhasil.
+    - Fungsi SQL Raka tidak ada di Gedung 1 (dicek 6 Nov).
+  - **Yang sudah tayang di staging** (`*-staging.kawanabadigrup.workers.dev`, saklar staging semua `supabase`):
+    - backend Supabase untuk aksi WO ketiga rumah;
+    - panel pengguna dan config di `/saklar`;
+    - ekspor payroll Excel;
+    - buku tamu kiriman;
+    - perbaikan halaman web (approvals, monitoring, form WO).
+  - **Belum layak produksi.** Yang wajib diperbaiki sebelum dipindah ke `main`:
+    1. **WO baru hilang saat sinkron.** WO baru SUM dan KMB TRA ditulis ke tabel cermin (`sum.work_orders`, `kmb.work_orders`), padahal sinkron cermin menghapus isi tabel itu.
+    2. **Saklar bisa dilewati.** Klien bisa memilih jalur Supabase lewat `?uji=supabase`, header `X-Active-Engine`, atau `engine` di body.
+    3. **Uang belum 1:1 GAS.** Tarif dan faktor tertulis mati di `src/domain/scoring.mjs` dan `payroll-excel.js` (helper 1.500, junior 2.500, senior 3.000, dipilih dari kata di jabatan). GAS membaca `Config_Factors` dan `Config_Settings` (`rate_<posisi>`; SUM: `idr_rate` × pengali golongan). Butuh keputusan Gabriel.
+    4. **Panel menampilkan data rekaan.** Bila RPC gagal, `/saklar` menampilkan unit dan pengguna rekaan dan "menyimpan" ke memori Worker.
+    5. **Buku tamu kiriman belum aman.**
+       - Rute `/api/buku-tamu/*` di pintu tanpa otorisasi.
+       - Rumah memercayai hasil tersimpan tanpa memeriksa token atau rumah.
+       - `tentukanUrlPintu` selalu memilih pintu staging (`|| true`), jadi rumah produksi tanpa binding akan menulis ke staging.
+       - Isinya disimpan di SaklarDO tanpa batas umur.
+    6. **Monitoring SUM membocorkan token.** Token semua mekanik ikut dikirim tanpa cek peran, padahal GAS membatasinya untuk L1/L2.
+    7. **Celah otorisasi di fungsi admin SQL staging (Gedung 2).** Detailnya tidak ditulis di repo publik sampai celah ditutup.
+    8. **Saklar dan asal WO belum benar.** Saklar KMB TRA dibaca dengan kunci `kmb`, padahal panel memakai `kmbtra` (#27 belum beres untuk KMB TRA). Asal WO ditebak dari jumlah digit, bukan dari awalan seperti di `docs/SAKLAR.md`.
+    9. **Uji belum membuktikan fungsi.** Uji Raka (40/40, 27/27, 24/24) sebagian besar hanya mencari teks di berkas. CI tidak jalan di `staging`, dan tidak ada PR.
+    10. **Konfigurasi produksi ikut diubah.** Di `wrangler.toml`, pintu produksi diberi Gedung 1 dan KMB Project produksi diberi binding pintu.
+  - **Temuan lain 13 Nov** (bukan kerja Raka):
+    - **Gedung 1 tidak ditemukan.** `sptgqsjgszwbreikxdph` NXDOMAIN, juga lewat DNS Google. Kemungkinan dijeda Supabase karena lama tidak dipakai (`pantau.yml` terjadwal dimatikan 29 Okt). Produksi tidak terdampak, karena saklar `gas`.
+    - **#24 masih tayang.** Tombol Web di pintu produksi membuka `<rumah>.abadiops.com/web`, yang tampil kosong. Perbaikannya (`ba2732d`) belum di-deploy karena token Cloudflare belum ada.
+    - **PWA produksi KMB Project diubah Raka.** Pada 2 Nov, `gabrielrurent/PWA-Project-KMB` diubah ke projek-v14 (menu WO tetap tampil saat kosong). Perubahan ini belum ada di `pwa/kmbprojek`.
+- Belum selesai / berikutnya:
+  - Gabriel:
+    - tutup celah Gedung 2 dengan SQL dari Claude;
+    - pulihkan Gedung 1 di dasbor Supabase;
+    - cabut akses Raka di Cloudflare, Supabase, dan GitHub;
+    - isi `C:\dev\rahasia\abadiops.env`.
+  - Claude:
+    - deploy pintu (`ba2732d`) begitu token ada;
+    - lalu pindahkan bagian staging yang benar ke `main` satu per satu, mengikuti daftar di atas.
+
+---
+
 ### 2026-10-30 · Gabriel (+ Claude) · bersama (audit kerja Raka 30 Okt di semua sistem)
 - Berubah:
   - Yang dicek: 7 commit Raka (`1c87734` sampai `b06ca6d`), Worker yang tayang, Supabase Gedung 1 dan Gedung 2, serta CI.
