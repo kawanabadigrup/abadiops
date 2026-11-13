@@ -12,6 +12,31 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: kerja Raka 13 Nov dipulihkan; buku tamu kiriman aman, butir 5)
+- Berubah:
+  - **Kerja Raka yang tidak pernah di-commit ditemukan dan dipulihkan** (`9ef10ca`):
+    - Worker rumah staging (sum `8faf8ee5`, kmb `fc1c12b1`, kmbprojek `5dbfa635`) di-deploy 13 Nov sekitar 12.30 WIB dengan kode yang tidak ada di commit mana pun. Ketahuan saat membandingkan kode tayang dengan `3e55ca8` sebelum deploy;
+    - berkas sumbernya diambil persis dari source map versi tayang (`sourcesContent`): `supabase-backend.js`, `web-handler.js`, `web-templates.js`, dan `payroll-excel.js` di ketiga rumah, +1.453 −171 baris;
+    - dipindai: tidak ada kata ajaib, data rekaan, atau kunci rahasia. Ada tarif tertanam 2.500 rupiah per poin sebagai cadangan `final_idr` (butir 3, titik henti uang), tidak diubah;
+    - arsip kode tayang dan source map-nya disimpan di komputer kerja (`C:\dev\arsip\raka-tayang-staging-2026-11-13\`);
+    - pintu staging versi Raka (`7ad8cc5a`) sama dengan `3e55ca8`, jadi deploy pintu sebelumnya tidak menghilangkan apa pun.
+  - **Buku tamu kiriman** (`7b41949`, butir 5):
+    - rute publik `/api/buku-tamu/*` di pintu dibuang. Dulu siapa saja bisa membaca hasil kiriman orang lain dan mengisi hasil palsu;
+    - rumah memakai SaklarDO langsung lewat ikatan Durable Object antar-Worker (`SAKLAR_DO`, `script_name` pintu). Tanpa ikatan, buku tamu tidak aktif; `tentukanUrlPintu` yang selalu memilih pintu staging dibuang;
+    - SaklarDO menyimpan di tabel SQLite `buku_tamu`, dengan kunci rumah + `op_id`, sidik SHA-256 pemilik token, dan umur 30 hari. Catatan model lama `op:<id>` dibuang;
+    - hasil hanya dikembalikan kepada pemilik token yang sama di rumah yang sama, dan hanya kiriman `success: true` yang dicatat. Dulu jawaban gagal ikut dicatat, sehingga kiriman ulang tidak pernah diproses lagi.
+  - **Tayang di staging:** pintu `dc48d3e9`, sum `c3c911ac`, kmb `79a48dd8`, kmbprojek `6be4911d`.
+  - **Uji lewat Worker rumah sungguhan** (aksi `ping`, tidak mengubah data):
+    - rute publik pintu: 404;
+    - pemilik yang sama, `op_id` yang sama: kiriman kedua dijawab buku tamu (`X-Abadi-Buku-Tamu: hit`), isinya sama persis. Lulus di SUM, KMB TRA, dan KMB Project;
+    - pengguna lain dengan `op_id` yang sama mendapat jawabannya sendiri, bukan hasil pemilik pertama. Tanpa token: 401;
+    - token karangan: kiriman kedua tetap diproses, karena jawaban gagal tidak dicatat.
+- **Pelajaran:** sebelum men-deploy Worker staging, bandingkan dulu kode yang tayang dengan branch. Source map versi tayang memuat berkas sumber asli, jadi kerja yang belum di-commit bisa dipulihkan.
+- Belum selesai / berikutnya:
+  - Kerja Raka 13 Nov yang dipulihkan belum diaudit seperti kerja Raka lainnya. Masuk audit sebelum merge (butir 9).
+  - Ikatan buku tamu untuk Worker produksi (`script_name` `abadiops-pintu`) dipasang saat staging di-merge ke `main`.
+  - Sisa daftar serah-terima: 1 (WO baru hilang saat sinkron), 2 (saklar bisa dilewati), 3 (uang, titik henti), 8, 9, 10.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: monitoring tidak lagi membocorkan token, butir 6)
 - Berubah:
   - **Aturan GAS yang ditiru**, dibaca langsung dari kode GAS (`MAR-SUM-v2`, `MAR-project`, `MAR-PROJEK-KMB`):
