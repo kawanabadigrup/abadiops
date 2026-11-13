@@ -12,6 +12,21 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (penjaga gedung: Supabase tidak dijeda lagi)
+- Berubah:
+  - Gedung 1 (`sptgqsjgszwbreikxdph`) NXDOMAIN sejak sebelum 13 Nov. Kemungkinan dijeda Supabase karena 7 hari tanpa aktivitas, sebab selama saklar `gas` tidak ada yang memanggilnya dan `pantau.yml` terjadwal dimatikan 29 Okt.
+  - Worker baru `abadiops-penjaga` (`workers/penjaga/`), cron `17 */6 * * *`:
+    - mengetuk Gedung 1 dan Gedung 2 lewat `sum_ping` dengan token palsu (hanya baca);
+    - ketukan yang gagal tercatat sebagai error di log Worker;
+    - `GET /cek` mengetuk saat itu juga.
+  - Aturan 6 di `docs/GEDUNG-DAN-STAGING.md` §1.
+  - Diuji 13 Nov: `/cek` menjawab Gedung 2 200, dan Gedung 1 530 (masih dijeda). Cron terdaftar di akun (satu-satunya cron).
+- Belum selesai / berikutnya:
+  - Gabriel memulihkan Gedung 1 dari dasbor Supabase. Sesudahnya `/cek` harus 200 untuk kedua gedung.
+  - Setelah pulih, cermin Gedung 1 perlu disinkron ulang. Isinya tertinggal: token uji 29–30 Okt tidak dikenali.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (deploy pintu produksi: #24 dan #26 tayang)
 - Berubah:
   - Token Cloudflare `abadiops-deploy` dipasang di `C:\dev\rahasia\abadiops.env`. Izinnya Workers di akun kawanabadigrup, serta Workers Routes/DNS edit dan Zone read di abadiops.com. Berlaku sampai 11 Feb 2027.
