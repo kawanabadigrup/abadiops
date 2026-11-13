@@ -19,16 +19,27 @@ export class SaklarDO {
     this.env = env;
   }
 
+  // Kode kamar yang aktif, dari RUMAH di wrangler.toml pintu (lingkungan Worker ini).
+  kodeRumah() {
+    let r = this.env && this.env.RUMAH;
+    try { r = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { r = null; }
+    return Array.isArray(r) ? r.map((x) => String(x.kode)) : [];
+  }
+
+  // Saklar setiap kamar aktif. Kamar yang baru ditambahkan ke RUMAH otomatis mendapat posisi bawaan 'gas'.
   async getSwitches() {
-    let switches = await this.ctx.storage.get('switches');
-    if (!switches) {
-      switches = {
-        kmbprojek: { posisi: 'gas', diubah_at: null, oleh: 'Sistem', alasan: 'Posisi bawaan' },
-        sum: { posisi: 'gas', diubah_at: null, oleh: 'Sistem', alasan: 'Posisi bawaan' },
-        kmbtra: { posisi: 'gas', diubah_at: null, oleh: 'Sistem', alasan: 'Posisi bawaan' },
-      };
-      await this.ctx.storage.put('switches', switches);
+    const tersimpan = (await this.ctx.storage.get('switches')) || {};
+    const switches = {};
+    let baru = false;
+    for (const kode of this.kodeRumah()) {
+      if (tersimpan[kode]) {
+        switches[kode] = tersimpan[kode];
+      } else {
+        switches[kode] = { posisi: 'gas', diubah_at: null, oleh: 'Sistem', alasan: 'Posisi bawaan' };
+        baru = true;
+      }
     }
+    if (baru) await this.ctx.storage.put('switches', { ...tersimpan, ...switches });
     return switches;
   }
 
@@ -141,6 +152,12 @@ export class SaklarDO {
       }
       if (!validPosisi.includes(posisi)) {
         return new Response(JSON.stringify({ success: false, error: 'Posisi saklar tidak sah: ' + posisi }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (!this.kodeRumah().includes(rumah)) {
+        return new Response(JSON.stringify({ success: false, error: 'Kode rumah tidak dikenal: ' + rumah }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
         });

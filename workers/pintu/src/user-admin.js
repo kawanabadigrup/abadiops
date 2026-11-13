@@ -21,29 +21,17 @@
  */
 
 import { validasiSesi } from './saklar-auth.js';
+import PROFIL_RUMAH from '../../../config/rumah.json';
 
-const AWALAN_TOKEN_RUMAH = {
-  sum: 'sum-',
-  kmbtra: 'kmb-',
-  kmb: 'kmb-',
-  kmbprojek: 'kmbp-',
-  'kmb-projek': 'kmbp-',
-};
-
+// Kode kamar persis seperti di RUMAH (wrangler.toml) dan config/rumah.json; tidak ada alias.
 function normalisasiKodeRumah(kode) {
-  const k = String(kode || '').trim().toLowerCase();
-  if (k === 'kmb' || k === 'kmbtra') return 'kmbtra';
-  if (k === 'kmb-projek' || k === 'kmb_projek' || k === 'kmbprojek') return 'kmbprojek';
-  if (k === 'sum') return 'sum';
-  return k;
+  return String(kode || '').trim().toLowerCase();
 }
 
+// Awalan fungsi database kamar (misalnya kmbprojek -> kmb_admin_*), dari config/rumah.json.
 function prefixRpcRumah(kodeRumah) {
-  const r = normalisasiKodeRumah(kodeRumah);
-  if (r === 'sum') return 'sum';
-  if (r === 'kmbtra') return 'kmbtra';
-  if (r === 'kmbprojek') return 'kmb';
-  return r;
+  const p = PROFIL_RUMAH[normalisasiKodeRumah(kodeRumah)];
+  return p && p.rpc ? p.rpc : null;
 }
 
 export function daftarRumahDariEnv(env) {
@@ -62,7 +50,7 @@ export function samarkanToken(token) {
 
 export function buatKandidatTokenRumah(kodeRumah) {
   const r = normalisasiKodeRumah(kodeRumah);
-  const prefix = AWALAN_TOKEN_RUMAH[r] || `${r}-`;
+  const prefix = (PROFIL_RUMAH[r] && PROFIL_RUMAH[r].awalan_token) || `${r}-`;
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
   const hex = Array.from(bytes)
@@ -78,6 +66,7 @@ async function tokenSudahDipakai(token, env) {
   const rumahList = daftarRumahDariEnv(env);
   const checks = rumahList.map(async (r) => {
     const prefix = prefixRpcRumah(r.kode);
+    if (!prefix) return false;
     if (env.SUPABASE_URL && (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY)) {
       try {
         const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
@@ -121,8 +110,6 @@ export async function buatTokenUnikLintasRumah(kodeRumah, env) {
  * - Jika `adminToken` kosong namun sesi panel sah, memanggil `_<prefix>_admin_<aksi>_internal`
  *   dengan kunci rahasia Supabase (`SUPABASE_SERVICE_ROLE_KEY`). Fungsi `_internal` hanya bisa dipanggil
  *   dengan kunci itu, jadi pintu masuk panel ada di Worker, bukan di kata ajaib yang bisa dipakai siapa saja.
- * - Jika berada di lingkungan simulasi/staging dengan `GAS_TIRUAN` dan tanpa koneksi luar,
- *   mendukung delegasi ke `GAS_TIRUAN`.
  */
 export async function panggilRpcAdminRumah({
   rumah,
@@ -136,20 +123,8 @@ export async function panggilRpcAdminRumah({
   const prefix = prefixRpcRumah(kode);
   const tokenBersih = String(adminToken || '').trim();
 
-  // 1. Jika di staging/uji lokal dengan binding GAS_TIRUAN dan tanpa SUPABASE_URL atau mode tiruan
-  if (env && env.GAS_TIRUAN && typeof env.GAS_TIRUAN.fetch === 'function' && (!env.SUPABASE_URL || env.USE_GAS_TIRUAN_ADMIN === 'true')) {
-    const resTiruan = await env.GAS_TIRUAN.fetch(`https://gas-tiruan.internal/${kode}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Abadi-Rumah': kode },
-      body: JSON.stringify({
-        action: `admin_${aksi}`,
-        token: tokenBersih || (sesiPanelSah ? `uji-palsu-spt-${kode}` : ''),
-        rumah: kode,
-        data: params,
-      }),
-    });
-    return await resTiruan.json();
-  }
+  if (!prefix) return { success: false, error: `Profil kamar ${kode} tidak ada di config/rumah.json` };
+
 
   if (!env || !env.SUPABASE_URL || (!env.SUPABASE_ANON_KEY && !env.SUPABASE_SERVICE_ROLE_KEY)) {
     return {
@@ -646,7 +621,7 @@ export async function tanganiApiUserAdmin(request, env, url, jsonHelper) {
     (url.pathname.endsWith('/config/simpan') || url.pathname.endsWith('/users/config-simpan')) &&
     request.method === 'POST'
   ) {
-    const rumah = normalisasiKodeRumah(body.rumah || 'kmbprojek');
+    const rumah = normalisasiKodeRumah(body.rumah);
     if (!validKode.includes(rumah)) {
       return jsonHelper({ success: false, error: `Kode rumah tidak sah: ${rumah}` }, 400);
     }
@@ -674,7 +649,7 @@ export async function tanganiApiUserAdmin(request, env, url, jsonHelper) {
     (url.pathname.endsWith('/config/hapus') || url.pathname.endsWith('/users/config-hapus')) &&
     request.method === 'POST'
   ) {
-    const rumah = normalisasiKodeRumah(body.rumah || 'kmbprojek');
+    const rumah = normalisasiKodeRumah(body.rumah);
     if (!validKode.includes(rumah)) {
       return jsonHelper({ success: false, error: `Kode rumah tidak sah: ${rumah}` }, 400);
     }

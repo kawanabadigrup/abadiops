@@ -1,0 +1,62 @@
+{
+  "sum": {
+    "nama": "SUM V2",
+    "skema": "sum",
+    "rpc": "sum",
+    "awalan_token": "sum-",
+    "section": [],
+    "peran": [
+      ["mechanic", "Mekanik"],
+      ["supervisor", "Supervisor (L1)"],
+      ["superintendent", "Superintendent (L2)"],
+      ["foreman", "Foreman"],
+      ["foreman_approver", "Foreman Approver"]
+    ]
+  },
+  "kmbtra": {
+    "nama": "KMB TRA / V2",
+    "skema": "kmb",
+    "rpc": "kmbtra",
+    "awalan_token": "kmb-",
+    "section": [
+      ["field", "Field"],
+      ["workshop", "Workshop"],
+      ["tyreman", "Tyreman"]
+    ],
+    "peran": [
+      ["mechanic", "Mekanik"],
+      ["supervisor", "Supervisor / Planner (L1)"],
+      ["superintendent", "Superintendent / Manager (L2)"]
+    ]
+  },
+  "kmbprojek": {
+    "nama": "KMB Projek",
+    "skema": "kmb_projek",
+    "rpc": "kmb",
+    "awalan_token": "kmbp-",
+    "section": [
+      ["maintenance", "Maintenance"],
+      ["vessel", "Vessel"]
+    ],
+    "peran": [
+      ["mechanic", "Mekanik"],
+      ["supervisor", "Supervisor / Planner (L1)"],
+      ["superintendent", "Superintendent / Manager (L2)"]
+    ]
+  },
+  "kmbbupr": {
+    "nama": "KMB Projek BUPR",
+    "skema": "kmbbupr",
+    "rpc": "kmbbupr",
+    "awalan_token": "kmbb-",
+    "section": [
+      ["maintenance", "Maintenance"],
+      ["vessel", "Vessel"]
+    ],
+    "peran": [
+      ["mechanic", "Mekanik"],
+      ["supervisor", "Supervisor / Planner (L1)"],
+      ["superintendent", "Superintendent / Manager (L2)"]
+    ]
+  }
+}

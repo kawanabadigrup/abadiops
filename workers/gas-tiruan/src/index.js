@@ -3,13 +3,15 @@
  *
  * PERINGATAN KERAS:
  * Worker ini TIDAK BOLEH memanggil Google Apps Script produksi maupun Google Sheets (AGENTS.md §5).
- * Fungsinya adalah meniru jawaban GAS untuk ketiga rumah (sum, kmbtra, kmbprojek)
+ * Fungsinya adalah meniru jawaban GAS untuk setiap kamar di config/rumah.json
  * di lingkungan staging agar tidak merusak spreadsheet dan payroll nyata.
  *
  * Aksi baca: Dijawab dari RPC Supabase Gedung 2 (dnnqrslftndcbmnvuveb).
  * Aksi tulis: Dijawab dengan format resmi GAS (misal nomor WO format GAS WO-YYYYMMDD-XXX)
  * tanpa pernah menulis ke Google Sheets.
  */
+
+import PROFIL_RUMAH from '../../../config/rumah.json';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -37,17 +39,11 @@ export default {
       });
     }
 
-    // Deteksi rumah dari pathname (/sum, /kmbtra, /kmbprojek), query (?rumah=...), atau header
-    let rumah = '';
-    const matchPath = url.pathname.match(/\/(sum|kmbtra|kmbprojek|kmb_projek)/i);
-    if (matchPath) {
-      rumah = matchPath[1].toLowerCase();
-      if (rumah === 'kmb_projek') rumah = 'kmbprojek';
-    } else if (url.searchParams.get('rumah')) {
-      rumah = url.searchParams.get('rumah').toLowerCase();
-    } else if (request.headers.get('x-abadi-rumah')) {
-      rumah = request.headers.get('x-abadi-rumah').toLowerCase();
-    }
+    // Kamar dari segmen pertama alamat (/sum, /kmbtra, ...), query (?rumah=...), atau header.
+    let rumah = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+    if (!PROFIL_RUMAH[rumah]) rumah = '';
+    if (!rumah && url.searchParams.get('rumah')) rumah = url.searchParams.get('rumah').toLowerCase();
+    if (!rumah && request.headers.get('x-abadi-rumah')) rumah = request.headers.get('x-abadi-rumah').toLowerCase();
 
     // Parse Body
     let parsed = {};
@@ -78,6 +74,12 @@ export default {
     const token = parsed.token || url.searchParams.get('token') || dataObj.token || request.headers.get('X-Abadi-Token') || '';
     if (!rumah && parsed.rumah) rumah = String(parsed.rumah).toLowerCase();
     if (!rumah && dataObj.rumah) rumah = String(dataObj.rumah).toLowerCase();
+
+    // Hanya kamar yang ada di config/rumah.json. Tanpa kamar, hanya ping yang dilayani (memeriksa semua kamar).
+    if (rumah && !PROFIL_RUMAH[rumah]) rumah = '';
+    if (!rumah && action !== 'ping') {
+      return responJson({ success: false, error: 'Kamar tidak dikenal. Pakai alamat /<kode kamar> sesuai config/rumah.json.' });
+    }
 
     // Jalankan penanganan aksi
     return tanganiAksi(action, token, rumah, { ...parsed, ...dataObj }, env);
@@ -121,7 +123,7 @@ async function tanganiAksi(action, token, rumah, parsed, env) {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const mockWoId = `WO-${today}-${randomSuffix}`;
-    const rpcName = dapatkanNamaRpc(rumah || 'kmbprojek', 'eksekusi_aksi_bertoken');
+    const rpcName = dapatkanNamaRpc(rumah, 'eksekusi_aksi_bertoken');
 
     // Coba simpan via Supabase RPC jika token tersedia agar muncul di tab mechanic
     let rpcRes = null;
@@ -244,7 +246,7 @@ async function tanganiAksi(action, token, rumah, parsed, env) {
         refsObj = refsRes ? await refsRes.json().catch(() => null) : null;
       }
       if (!refsObj || !refsObj.result) {
-        const rpcDirect = dapatkanNamaRpc(rumah || 'kmbprojek', 'create_refs');
+        const rpcDirect = dapatkanNamaRpc(rumah, 'create_refs');
         const directRes = await panggilRpcGedung2(rpcDirect, {}, env).catch(() => null);
         if (directRes) refsObj = directRes;
       }
@@ -303,34 +305,7 @@ async function tanganiPing(token, rumah, env) {
     return responJson({ success: false, error: 'Token tidak dikenal / nonaktif' });
   }
 
-  // Dukungan token uji instan staging (uji-palsu-*)
-  if (token.startsWith('uji-palsu-') || token.startsWith('test-')) {
-    const t = token.toLowerCase();
-    let tokenRumah = '';
-    if (t.includes('sum')) tokenRumah = 'sum';
-    else if (t.includes('kmbtra') || t.includes('-kmb-') || t.endsWith('-kmb')) tokenRumah = 'kmbtra';
-    else if (t.includes('kmbp') || t.includes('projek')) tokenRumah = 'kmbprojek';
-
-    // Jika dipanggil dari rumah tertentu dan token ditujukan untuk rumah lain, tolak
-    if (rumah && tokenRumah && rumah !== tokenRumah) {
-      return responJson({ success: false, error: 'Token tidak dikenal / nonaktif' });
-    }
-
-    const r = rumah || tokenRumah || 'kmbprojek';
-    return responJson({
-      success: true,
-      result: {
-        nama: `Tester Staging (${r.toUpperCase()})`,
-        name: `Tester Staging (${r.toUpperCase()})`,
-        role: token.includes('spv') ? 'supervisor' : (token.includes('spt') ? 'superintendent' : 'mechanic'),
-        mechanic_id: `MECH-${r.toUpperCase()}-001`,
-        token,
-        rumah: r,
-      },
-    });
-  }
-
-  const rumahList = rumah ? [rumah] : ['sum', 'kmbtra', 'kmbprojek'];
+  const rumahList = rumah ? [rumah] : Object.keys(PROFIL_RUMAH);
 
   for (const r of rumahList) {
     const rpcName = dapatkanNamaRpc(r, 'ping');
@@ -352,7 +327,7 @@ async function tanganiPing(token, rumah, env) {
 }
 
 async function panggilRpcBertoken(rumah, jenis, token, env) {
-  const r = rumah || 'kmbprojek';
+  const r = rumah;
   const rpcName = dapatkanNamaRpc(r, jenis + '_bertoken');
   try {
     const res = await panggilRpcGedung2(rpcName, { p_token: token }, env);
@@ -366,7 +341,7 @@ async function panggilRpcBertoken(rumah, jenis, token, env) {
 }
 
 async function panggilRpcStatus(rumah, status, token, env) {
-  const r = rumah || 'kmbprojek';
+  const r = rumah;
   const rpcName = dapatkanNamaRpc(r, 'wos_by_status_bertoken');
   try {
     const res = await panggilRpcGedung2(rpcName, { p_status: status, p_token: token }, env);
@@ -381,14 +356,9 @@ async function panggilRpcStatus(rumah, status, token, env) {
 }
 
 function dapatkanNamaRpc(rumah, namaAksi) {
-  if (rumah === 'sum') {
-    return `sum_${namaAksi}`;
-  }
-  if (rumah === 'kmbtra' || rumah === 'kmb') {
-    return `kmbtra_${namaAksi}`;
-  }
-  // kmbprojek
-  return `kmb_${namaAksi}`;
+  const p = PROFIL_RUMAH[rumah];
+  if (!p) throw new Error(`Kamar ${rumah} tidak ada di config/rumah.json`);
+  return `${p.rpc}_${namaAksi}`;
 }
 
 async function panggilRpcGedung2(rpcName, params, env) {
@@ -424,7 +394,7 @@ function responJson(obj, status = 200) {
 }
 
 async function simpanWoGedung2(rumah, woId, data, env) {
-  const schema = rumah === 'sum' ? 'sum' : (rumah === 'kmbtra' || rumah === 'kmb' ? 'kmb' : 'kmb_projek');
+  const schema = PROFIL_RUMAH[rumah].skema;
   const url = `${env.SUPABASE_URL}/rest/v1/work_orders`;
   
   const payload = {

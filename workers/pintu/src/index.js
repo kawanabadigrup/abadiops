@@ -18,6 +18,7 @@
 import { SaklarDO } from './saklar-do.js';
 import { verifikasiKataSandi, validasiSesi } from './saklar-auth.js';
 import { tanganiApiUserAdmin, handleAdminDaftarUsers, handleAdminSimpanUser, handleAdminSetTokenStatus } from './user-admin.js';
+import PROFIL_RUMAH from '../../../config/rumah.json';
 
 export { SaklarDO };
 
@@ -26,7 +27,14 @@ const BATAS_GAS_MS = 25000;
 function daftarRumah(env) {
   const r = typeof env.RUMAH === 'string' ? JSON.parse(env.RUMAH) : env.RUMAH;
   if (!Array.isArray(r) || !r.length) throw new Error('RUMAH belum dikonfigurasi di wrangler.toml');
+  for (const x of r) if (!PROFIL_RUMAH[x.kode]) throw new Error(`Kamar ${x.kode} ada di RUMAH tapi tidak ada di config/rumah.json`);
   return r;
+}
+
+// Satu kamar untuk panel: identitas dari RUMAH (berbeda per lingkungan), sifat dari config/rumah.json.
+function ringkasRumahPanel(r) {
+  const p = PROFIL_RUMAH[r.kode];
+  return { kode: r.kode, nama: r.nama || p.nama, alamat: r.alamat, skema: p.skema, section: p.section, peran: p.peran };
 }
 
 function json(obj, status = 200, headers = {}) {
@@ -250,7 +258,7 @@ export default {
         }
         return json({
           success: true,
-          rumah_list: rumahList.map((r) => ({ kode: r.kode, nama: r.nama, alamat: r.alamat })),
+          rumah_list: rumahList.map(ringkasRumahPanel),
           switches,
           history: [],
         });
@@ -260,7 +268,7 @@ export default {
       const data = await resp.json();
       return json({
         ...data,
-        rumah_list: rumahList.map((r) => ({ kode: r.kode, nama: r.nama, alamat: r.alamat })),
+        rumah_list: rumahList.map(ringkasRumahPanel),
       });
     }
 

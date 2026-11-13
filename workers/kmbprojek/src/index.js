@@ -215,34 +215,27 @@ function catat(env, isi) {
 
 let cacheSaklar = { nilai: null, waktu: 0 };
 
+// Posisi saklar kamar ini dibaca dari pintu lewat ikatan Worker (env.PINTU), dengan kunci env.RUMAH: kode yang
+// sama dengan RUMAH di pintu dan config/rumah.json. Tanpa ikatan, kamar memakai env.SAKLAR atau 'gas'. Tidak ada
+// alamat pintu yang ditulis di kode, dan tidak ada cadangan ke saklar kamar lain.
 export async function bacaStatusSaklar(env) {
   if (env && (env.STORAGE_MODE === 'SUPABASE' || env.SAKLAR === 'supabase')) {
     return 'supabase';
   }
   const sekarang = Date.now();
-  // Jika PINTU service binding tersedia, panggil langsung (0ms internal RPC) agar pembalikan saklar berlaku seketika tanpa jeda cache
-  if (!(env && env.PINTU) && cacheSaklar.nilai && cacheSaklar.waktu > sekarang) {
+  if (cacheSaklar.nilai && cacheSaklar.waktu > sekarang) {
     return cacheSaklar.nilai;
   }
   let hasil = (env && env.SAKLAR) || 'gas';
+  if (!env || !env.PINTU || typeof env.PINTU.fetch !== 'function') return hasil;
   try {
-    let r = null;
-    if (env && env.PINTU && typeof env.PINTU.fetch === 'function') {
-      r = await env.PINTU.fetch('https://pintu.internal/api/saklar/status');
-    } else {
-      const isStaging = (env?.GAS_URL && env.GAS_URL.includes('gas-tiruan')) || (env?.RUMAH && env.RUMAH.includes('staging'));
-      const url = env?.PINTU_STATUS_URL || (isStaging
-        ? 'https://abadiops-pintu-staging.kawanabadigrup.workers.dev/api/saklar/status'
-        : 'https://abadiops.com/api/saklar/status');
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 1200);
-      r = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(t);
-    }
-    if (r && r.ok) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3500);
+    const r = await env.PINTU.fetch('https://pintu.internal/api/saklar/status', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) {
       const data = await r.json();
-      const sw = data?.switches || {};
-      const val = sw[env?.RUMAH] || sw['kmbprojek'] || sw['kmbprojek'];
+      const val = data && data.switches && data.switches[env.RUMAH];
       if (val) {
         hasil = val;
         cacheSaklar = { nilai: hasil, waktu: sekarang + 5000 };

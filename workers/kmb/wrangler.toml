@@ -31,7 +31,7 @@ html_handling = "none"
 not_found_handling = "none"
 
 [vars]
-RUMAH = "kmb"
+RUMAH = "kmbtra"
 SAKLAR = "gas"
 # Web app GAS produksi KMB V2 (script 17sBKK…). Alamat ini juga tertulis di PWA lama.
 GAS_URL = "https://script.google.com/macros/s/AKfycbwlwlQvOGVF6FdKkYRNlbgdJCets5L-0AfufMB4_79_HzvoQkeE9aZAqkKZiXCZHXnG6Q/exec"
@@ -60,7 +60,7 @@ bindings = [
 ]
 
 [env.staging.vars]
-RUMAH = "kmb"
+RUMAH = "kmbtra"
 SAKLAR = "supabase"
 GAS_URL = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbtra"
 SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"

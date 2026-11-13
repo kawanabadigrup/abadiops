@@ -16,6 +16,7 @@ import {
   labelKondisi,
   getRateForJabatan,
 } from './payroll-excel.js';
+import PROFIL_RUMAH from '../../../config/rumah.json';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -75,33 +76,27 @@ function hitungSkorMandiri(m) {
 
 let cacheSaklar = { nilai: null, waktu: 0 };
 
+// Posisi saklar kamar ini dibaca dari pintu lewat ikatan Worker (env.PINTU), dengan kunci env.RUMAH: kode yang
+// sama dengan RUMAH di pintu dan config/rumah.json. Tanpa ikatan, kamar memakai env.SAKLAR atau 'gas'. Tidak ada
+// alamat pintu yang ditulis di kode, dan tidak ada cadangan ke saklar kamar lain.
 export async function bacaStatusSaklar(env) {
-  if (env.STORAGE_MODE === 'SUPABASE' || env.SAKLAR === 'supabase') {
+  if (env && (env.STORAGE_MODE === 'SUPABASE' || env.SAKLAR === 'supabase')) {
     return 'supabase';
   }
   const sekarang = Date.now();
   if (cacheSaklar.nilai && cacheSaklar.waktu > sekarang) {
     return cacheSaklar.nilai;
   }
-  let hasil = env.SAKLAR || 'gas';
+  let hasil = (env && env.SAKLAR) || 'gas';
+  if (!env || !env.PINTU || typeof env.PINTU.fetch !== 'function') return hasil;
   try {
-    const isStaging = (env.GAS_URL && env.GAS_URL.includes('gas-tiruan')) || (env.RUMAH && env.RUMAH.includes('staging'));
-    const url = isStaging
-      ? 'https://abadiops-pintu-staging.kawanabadigrup.workers.dev/api/saklar/status'
-      : 'https://abadiops.com/api/saklar/status';
-
-    const fetcher = (env && env.PINTU && typeof env.PINTU.fetch === 'function')
-      ? env.PINTU.fetch.bind(env.PINTU)
-      : fetch;
-
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 3500);
-    const r = await fetcher(url, { signal: ctrl.signal });
+    const r = await env.PINTU.fetch('https://pintu.internal/api/saklar/status', { signal: ctrl.signal });
     clearTimeout(t);
     if (r.ok) {
       const data = await r.json();
-      const rKey = (env.RUMAH === 'kmb') ? 'kmbtra' : env.RUMAH;
-      const val = data?.switches?.[rKey] || data?.switches?.[env.RUMAH];
+      const val = data && data.switches && data.switches[env.RUMAH];
       if (val) {
         hasil = val;
         cacheSaklar = { nilai: hasil, waktu: sekarang + 5000 };
@@ -321,8 +316,13 @@ export async function eksekusiSupabaseBackendKmbp(action, token, body, env) {
     'Content-Type': 'application/json',
   };
 
-  const rumah = (env.RUMAH || 'kmbtra').toLowerCase();
-  const rpcPrefix = (rumah === 'sum') ? 'sum' : (rumah === 'kmbtra' || rumah === 'kmb') ? 'kmbtra' : 'kmb';
+  const rpcPrefix = (PROFIL_RUMAH[env.RUMAH] || {}).rpc;
+  if (!rpcPrefix) {
+    return new Response(JSON.stringify({ success: false, error: `Profil kamar ${env.RUMAH} tidak ada di config/rumah.json`, source: 'SUPABASE' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+  }
   const rpcUrl = `${env.SUPABASE_URL}/rest/v1/rpc/${rpcPrefix}_eksekusi_aksi_bertoken`;
 
   
