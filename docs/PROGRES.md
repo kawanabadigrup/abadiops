@@ -22,7 +22,8 @@ Formatnya:
   - **`--periksa=harian`:** sekali per hari kalender WIB per rumah, mulai pukul 02.00 WIB. Workflow `cermin` tiap jam memakainya. Kalau dijalankan manual, ada pilihan "periksa" untuk memeriksa sekarang juga.
   - **Uji:**
     - kueri selisih menangkap baris yang berubah, hilang, dan berlebih (0, lalu 2, lalu 3, di dalam transaksi yang dibatalkan);
-    - pemeriksaan BUPR: 23 dari 23 sheet sama.
+    - pemeriksaan BUPR: 23 dari 23 sheet sama;
+    - pemeriksaan penuh pertama dari GitHub (dijalankan manual 14 Nov 00:00 WIB, ±14 menit): **87 dari 87 sheet sama** di keempat rumah, workflow hijau.
   - `docs/SAKLAR.md`: tempat melihat laporan, dan ukuran syarat 7 hari.
 - Belum selesai / berikutnya:
   - Syarat "7 hari tanpa selisih" paling cepat terpenuhi 20 Nov (14–20 Nov), kalau setiap hari bersih.
