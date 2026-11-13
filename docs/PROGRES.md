@@ -12,6 +12,27 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin per baris; jadwal tiap jam di GitHub Actions)
+- Berubah:
+  - **Sinkron per baris** (`tools/cermin/sinkron.mjs`):
+    - sheet yang sidiknya sama dengan sinkron sebelumnya, dan jumlah barisnya cocok, tidak ditulis ulang;
+    - sheet yang berubah dimuat dulu ke tabel sementara. Hanya baris baru atau berubah yang ditulis (perbandingan nilai `jsonb`), dan baris yang hilang dihapus;
+    - `cermin_log` mendapat kolom `baris_berubah` dan `baris_dihapus`. Catatan yang lebih tua dari 35 hari dihapus;
+    - opsi baru `--semua` (semua `<SKEMA>_SPREADSHEET_ID` di lingkungan) dan `--ringkas` (satu baris per rumah, tanpa judul, ID, atau isi data);
+    - uji di Gedung 1: 23 sheet BUPR tidak berubah, dan dari SUM hanya 4 sheet yang berubah (7 baris ditulis). Ukuran tetap 245 MB;
+    - sidik setiap sheet dihitung ulang dari isi Gedung 1: 87 dari 87 sheet identik dengan spreadsheet saat sinkron terakhir.
+  - **Jadwal tiap jam** (`.github/workflows/cermin.yml`, menit ke-41):
+    - koneksi lewat pooler IPv4 (`aws-0-ap-southeast-1`), karena runner GitHub tidak punya IPv6;
+    - rahasia Actions `GOOGLE_SA_KEY_JSON`, `CERMIN_DATABASE_URL`, dan `CERMIN_RUMAH` diisi dari `abadiops.env` lewat API GitHub. Tokennya fine-grained `abadiops-cermin`: hanya repo abadiops, izin Actions dan Secrets, berlaku sampai 11 Feb 2027;
+    - rumah baru cukup ditambah satu baris di `CERMIN_RUMAH`, tanpa mengubah kode;
+    - log dibuat ringkas karena repo publik, dan ID spreadsheet disamarkan.
+- Belum selesai / berikutnya:
+  - Putaran pertama di GitHub dijalankan setelah push ini. Hasilnya dicatat di entri berikutnya.
+  - Hitungan "7 hari tanpa selisih" dimulai dari putaran terjadwal pertama yang lulus.
+  - Pemeriksaan selisih harian perlu dibuat tanpa menarik seluruh isi tabel, karena batas egress paket gratis 5 GB per bulan. Caranya: simpan sidik yang bisa dihitung di sisi database.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin keempat rumah tertulis di Gedung 1)
 - Berubah:
   - **Keputusan Gabriel** (`docs/KEPUTUSAN.md`):

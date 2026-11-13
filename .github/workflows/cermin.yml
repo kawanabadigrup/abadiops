@@ -1,0 +1,70 @@
+name: Cermin
+
+# Sinkron cermin spreadsheet -> Gedung 1 (Supabase produksi), tiap jam.
+#
+# Alatnya `tools/cermin/sinkron.mjs`. Ia hanya MEMBACA spreadsheet lewat akun layanan
+# (Viewer), tidak menyentuh GAS, dan menulis per baris: sheet yang tidak berubah tidak
+# ditulis ulang, jadi menjalankannya tiap jam tidak membuat tabel membengkak.
+#
+# Rahasia (Settings -> Secrets and variables -> Actions -> Secrets), diisi dari abadiops.env:
+#   GOOGLE_SA_KEY_JSON    isi file JSON kunci akun layanan
+#   CERMIN_DATABASE_URL   koneksi Gedung 1 lewat pooler IPv4. Runner GitHub tidak punya IPv6,
+#                         sedangkan host database langsung (db.<ref>.supabase.co) hanya IPv6.
+#   CERMIN_RUMAH          satu baris per rumah: <SKEMA>_SPREADSHEET_ID=<id>. Rumah baru cukup
+#                         ditambah satu baris di sini, tanpa mengubah kode.
+#
+# Repo ini publik, jadi log Actions bisa dibaca siapa saja. Karena itu alat dijalankan dengan
+# --ringkas: tanpa judul spreadsheet, ID, atau isi data. Workflow yang gagal mengirim surel
+# ke pemilik repo; itulah pemberitahuannya.
+
+on:
+  schedule:
+    - cron: '41 * * * *'    # tiap jam, menit ke-41, menjauhi antrean awal jam
+  workflow_dispatch:        # supaya bisa dijalankan sekarang, tanpa menunggu
+
+permissions:
+  contents: read
+
+# Satu putaran makan beberapa menit. Kalau putaran sebelumnya belum selesai, putaran baru menunggu.
+concurrency:
+  group: cermin
+  cancel-in-progress: false
+
+jobs:
+  sinkron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Alat ini hanya butuh paket postgres; `npm ci` penuh memasang seluruh aplikasi.
+      # Versinya sama dengan package-lock.json.
+      - run: npm install --prefix tools/cermin --no-save --no-package-lock --no-audit --no-fund postgres@3.4.9
+
+      - name: Sinkron
+        env:
+          GOOGLE_SA_KEY_JSON: ${{ secrets.GOOGLE_SA_KEY_JSON }}
+          DATABASE_URL: ${{ secrets.CERMIN_DATABASE_URL }}
+          CERMIN_RUMAH: ${{ secrets.CERMIN_RUMAH }}
+        run: |
+          if [ -z "$GOOGLE_SA_KEY_JSON" ] || [ -z "$DATABASE_URL" ] || [ -z "$CERMIN_RUMAH" ]; then
+            echo "::error::Rahasia GOOGLE_SA_KEY_JSON, CERMIN_DATABASE_URL, atau CERMIN_RUMAH belum diisi."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$GOOGLE_SA_KEY_JSON" > "$RUNNER_TEMP/akun-layanan.json"
+          export GOOGLE_SA_KEY_FILE="$RUNNER_TEMP/akun-layanan.json"
+          # Setiap baris CERMIN_RUMAH menjadi variabel lingkungan <SKEMA>_SPREADSHEET_ID.
+          while IFS='=' read -r kunci nilai; do
+            kunci="${kunci//[$'\r\t ']/}"
+            nilai="${nilai//[$'\r\t ']/}"
+            if [[ "$kunci" =~ ^[A-Z][A-Z0-9_]*_SPREADSHEET_ID$ && -n "$nilai" ]]; then
+              echo "::add-mask::$nilai"
+              export "$kunci=$nilai"
+            fi
+          done <<< "$CERMIN_RUMAH"
+          node tools/cermin/sinkron.mjs --semua --ringkas
