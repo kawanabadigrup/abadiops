@@ -2014,14 +2014,8 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'Token tidak dikenal / nonaktif');
   END IF;
 
-  IF v_clean = '__PANEL_SAKLAR_PUSAT__' THEN
-    RETURN jsonb_build_object(
-      'ok', true,
-      'mechanic_id', 'GABRIEL-PANEL',
-      'name', 'Panel Saklar Pusat',
-      'role', 'admin'
-    );
-  END IF;
+  -- Tidak ada kata ajaib pengganti token. Panel saklar memanggil fungsi _internal dengan kunci rahasia
+  -- Supabase lewat Worker pintu; fungsi *_bertoken hanya menerima token pengguna yang sah.
 
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -3226,14 +3220,8 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'Token tidak dikenal / nonaktif');
   END IF;
 
-  IF v_clean = '__PANEL_SAKLAR_PUSAT__' THEN
-    RETURN jsonb_build_object(
-      'ok', true,
-      'mechanic_id', 'GABRIEL-PANEL',
-      'name', 'Panel Saklar Pusat',
-      'role', 'admin'
-    );
-  END IF;
+  -- Tidak ada kata ajaib pengganti token. Panel saklar memanggil fungsi _internal dengan kunci rahasia
+  -- Supabase lewat Worker pintu; fungsi *_bertoken hanya menerima token pengguna yang sah.
 
   SELECT t.data->>'token' AS token,
          coalesce(nullif(trim(m.data->>'mechanic_id'), ''), trim(t.data->>'mechanic_id'), '') AS mechanic_id,
@@ -4456,14 +4444,8 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'Token tidak dikenal / nonaktif');
   END IF;
 
-  IF v_clean = '__PANEL_SAKLAR_PUSAT__' THEN
-    RETURN jsonb_build_object(
-      'ok', true,
-      'mechanic_id', 'GABRIEL-PANEL',
-      'name', 'Panel Saklar Pusat',
-      'role', 'admin'
-    );
-  END IF;
+  -- Tidak ada kata ajaib pengganti token. Panel saklar memanggil fungsi _internal dengan kunci rahasia
+  -- Supabase lewat Worker pintu; fungsi *_bertoken hanya menerima token pengguna yang sah.
 
   SELECT t.data->>'token' AS token,
          coalesce(nullif(trim(m.data->>'mechanic_id'), ''), trim(t.data->>'mechanic_id'), '') AS mechanic_id,

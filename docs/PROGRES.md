@@ -12,6 +12,27 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: kata ajaib panel dan data rekaan dibuang)
+- Berubah:
+  - **`main` digabung ke `staging`** (`09a6581`). Bentrok hanya di PROGRES dan BUG-DICATAT, tanpa baris yang dibuang. Bug #29 milik staging (cache dasbor mekanik SUM) menjadi #30, karena #29 sudah dipakai di `main`.
+  - **Kata ajaib dibuang** (butir 7 daftar serah-terima 13 Nov):
+    - `workers/pintu/src/user-admin.js`: panel tanpa token admin wajib memanggil fungsi `_<rumah>_admin_*_internal` dengan kunci rahasia Supabase (`SUPABASE_SERVICE_ROLE_KEY`). Kalau kunci itu belum dipasang, panel menolak dengan pesan yang jelas;
+    - `db/kmb_projek/migrasi_kamis_full_penuh.sql`: cabang `__PANEL_SAKLAR_PUSAT__` dibuang dari ketiga `_<rumah>_validasi_admin_token`;
+    - Gedung 2, dalam satu transaksi: ketiga pemeriksa dipasang ulang tanpa kata ajaib, lalu EXECUTE 30 fungsi `*_admin_*_bertoken` dikembalikan seperti di file SQL.
+  - **Data rekaan dibuang** (butir 4, bug #31): `STAGING_MASTER_CONFIG`, `STAGING_MASTER_USERS`, dan `tanganiFallbackStagingStore` dihapus dari `user-admin.js`. Kalau RPC gagal, panel menampilkan galatnya, bukan unit, faktor, dan pengguna karangan.
+  - **Uji dari luar dengan kunci publik staging:**
+    - kata ajaib ke `*_admin_daftar_user_bertoken` dan `kmbtra_admin_simpan_config_bertoken`: ditolak ("Token tidak dikenal / nonaktif");
+    - token karangan: ditolak;
+    - `_sum_admin_daftar_user_internal` dengan kunci publik: 401, permission denied.
+  - Jalur pooler IPv4 untuk Gedung 2 (`DATABASE_URL_GEDUNG2_POOLER` di `abadiops.env`), karena IPv6 di komputer kerja putus-sambung.
+- Belum selesai / berikutnya:
+  - Pasang secret `SUPABASE_SERVICE_ROLE_KEY` (kunci rahasia Gedung 2) di `abadiops-pintu-staging`, deploy pintu staging, lalu uji menu pengguna dan config di panel staging.
+  - Aplikasi rumah staging: `admin_simpan_user` mengirim `p_user`, padahal fungsi SQL meminta `p_op_id` dan `p_payload`; `*_admin_set_token_status_bertoken` tidak ada di SQL. Sekarang jalur itu jatuh ke GAS tiruan.
+  - Pintu staging dengan binding `GAS_TIRUAN` masih punya jalur token `uji-palsu-spt-<rumah>` kalau `USE_GAS_TIRUAN_ADMIN=true`. Sekarang tidak aktif; dibuang sebelum merge ke `main`.
+  - Butir serah-terima berikutnya: 5 (buku tamu kiriman) dan 6 (monitoring SUM membocorkan token).
+
+---
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama (laporan selisih harian cermin)
 - Berubah:
   - **`tools/cermin/sinkron.mjs --periksa`:**
