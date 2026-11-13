@@ -1,47 +1,38 @@
 #!/usr/bin/env node
 /**
- * Sinkron cermin SUM V2: spreadsheet → Supabase skema `sum`.
- * Rumah: sum · Pemegang: Gabriel · Penjelasan: db/sum/README.md
+ * Sinkron cermin: spreadsheet satu rumah → Supabase, skema milik rumah itu. Satu alat untuk semua rumah.
+ * Menggantikan tools/{sum,kmb,kmb_projek}/sinkron-cermin.mjs (docs/BUG-DICATAT.md #29).
+ * Format cermin sama dengan db/sum/cermin_sheet.sql; penjelasan di db/sum/README.md.
  *
  * Alat ini HANYA MEMBACA spreadsheet, memakai akun layanan Google yang diberi hak
  * Viewer. Ia tidak pernah menulis ke spreadsheet, dan tidak menyentuh GAS.
  *
+ * Tidak ada daftar sheet yang tertanam. Alat membaca daftar sheet dari spreadsheet, lalu
+ * menyalin setiap sheet ke tabel bernama snake_case dari nama sheetnya
+ * (WorkOrders_Archive → work_orders_archive, HmKoreksi → hm_koreksi). Tabel yang belum ada
+ * dibuat dengan bentuk cermin mentah (baris, nilai, data). Tabel yang sudah ada tapi bentuknya
+ * lain tidak disentuh, dan sheet itu dilaporkan GAGAL.
+ *
  * Variabel lingkungan:
- *   GOOGLE_SA_KEY_FILE   path ke file JSON kunci akun layanan (simpan DI LUAR repo)
- *   SUM_SPREADSHEET_ID   ID spreadsheet SUM V2
- *   DATABASE_URL         koneksi Postgres Supabase (session pooler, porta 5432)
+ *   GOOGLE_SA_KEY_FILE       path ke file JSON kunci akun layanan (simpan DI LUAR repo)
+ *   <SKEMA>_SPREADSHEET_ID   ID spreadsheet rumah. Nama skema = awalannya dalam huruf kecil:
+ *                            SUM_ → sum, KMB_ → kmb (KMB TRA), KMB_PROJEK_ → kmb_projek, KMBBUPR_ → kmbbupr
+ *   DATABASE_URL             koneksi Postgres Supabase (tidak dipakai dengan --kering)
  *
  * Opsi:
- *   --sheet=WorkOrders   hanya menyinkronkan satu sheet
- *   --kering             baca dan hitung saja, tanpa menulis ke database
- *
- * Status: uji kering lulus 13 Nov 2026 (19 dari 19 sheet). Belum pernah menulis ke database.
+ *   --skema=sum              rumah yang disinkron (wajib)
+ *   --sheet=WorkOrders       hanya menyinkronkan satu sheet
+ *   --lewati=AuditLogs       sheet yang tidak disalin, dipisah koma. Bawaannya AuditLogs (keputusan
+ *                            Gabriel 13 Nov, demi ukuran Gedung 1). `--lewati=` berarti semua sheet disalin.
+ *   --kering                 baca dan hitung saja, tanpa menulis ke database
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 
-// Nama sheet produksi → nama tabel di skema `sum` (lihat docs/INVENTARIS-SUM.md).
-const SHEET_KE_TABEL = {
-  Config_Components: 'config_components',
-  Config_Units: 'config_units',
-  Config_Mechanics: 'config_mechanics',
-  Config_Factors: 'config_factors',
-  Config_BaseSettings: 'config_base_settings',
-  ApiTokens: 'api_tokens',
-  WorkOrders: 'work_orders',
-  WorkOrders_Archive: 'work_orders_archive',
-  WorkOrderTeam: 'work_order_team',
-  Approvals: 'approvals',
-  ScoringSnapshots: 'scoring_snapshots',
-  MechanicPoints: 'mechanic_points',
-  OthersJobRequests: 'others_job_requests',
-  AuditLogs: 'audit_logs',
-  MtbfTracking: 'mtbf_tracking',
-  ProcessedOps: 'processed_ops',
-  WebKiriman: 'web_kiriman',
-  NotificationQueue: 'notification_queue',
-  PushSubs: 'push_subs',
-};
+const LEWATI_BAWAAN = 'AuditLogs';
+
+// Kolom yang biasa dipakai mencari baris. Kalau ada di header sebuah sheet, kolom itu diberi indeks.
+const KOLOM_KUNCI = ['id', 'wo_id', 'wo_number', 'mechanic_id', 'token', 'op_id'];
 
 const BARIS_PER_AMBIL = 2000;
 const BARIS_PER_INSERT = 1000;
@@ -59,9 +50,19 @@ const arg = Object.fromEntries(process.argv.slice(2).map((a) => {
 
 function wajib(nama) {
   const v = process.env[nama];
-  if (!v) throw new Error(`${nama} belum diisi. Lihat db/sum/README.md.`);
+  if (!v) throw new Error(`${nama} belum diisi. Lihat kepala berkas tools/cermin/sinkron.mjs.`);
   return v;
 }
+
+// Nama sheet → nama tabel: Config_BaseSettings → config_base_settings, WorkOrderTeam → work_order_team.
+const keTabel = (sheet) => sheet
+  .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+  .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+  .replace(/[^A-Za-z0-9]+/g, '_')
+  .replace(/^_+|_+$/g, '')
+  .toLowerCase();
+
+const ident = (s) => `"${String(s).replace(/"/g, '""')}"`;
 
 // ── Login akun layanan Google (JWT RS256), cakupan baca-saja ─────────────────
 async function aksesToken(keyFile) {
@@ -90,7 +91,7 @@ async function aksesToken(keyFile) {
 }
 
 // Kuota Sheets API: 60 permintaan baca per menit per akun layanan. Beri jeda antarpermintaan,
-// dan kalau tetap kena 429 atau galat 5xx, tunggu lalu coba lagi.
+// dan kalau tetap kena 429, galat 5xx, atau jaringan putus sesaat, tunggu lalu coba lagi.
 const JEDA_MS = 1100;
 let terakhirMs = 0;
 const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -99,7 +100,15 @@ async function gapi(url, token) {
   for (let coba = 1; ; coba++) {
     await tidur(terakhirMs + JEDA_MS - Date.now());
     terakhirMs = Date.now();
-    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    let res;
+    try {
+      res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    } catch (e) {
+      if (coba >= 5) throw e;
+      console.log(`  jaringan: ${e.message}, mencoba lagi (${coba + 1}/5)`);
+      await tidur(5000 * coba);
+      continue;
+    }
     if (res.ok) return res.json();
     const pesan = `${res.status} ${url.split('?')[0]}: ${(await res.text()).replace(/\s+/g, ' ').slice(0, 300)}`;
     if ((res.status !== 429 && res.status < 500) || coba >= 5) throw new Error(pesan);
@@ -184,72 +193,139 @@ async function bacaSheet(id, judul, jumlahBarisGrid, zona, token) {
 const sidikDari = (headers, rows) => crypto.createHash('sha256')
   .update(JSON.stringify({ headers, rows: rows.map((r) => r.nilai) })).digest('hex');
 
+// ── Bentuk cermin di database, sama dengan db/sum/cermin_sheet.sql ───────────
+async function siapkanSkema(sql, skema) {
+  await sql`CREATE SCHEMA IF NOT EXISTS ${sql(skema)}`;
+  await sql`CREATE TABLE IF NOT EXISTS ${sql(skema + '.cermin_meta')} (
+    kunci     text PRIMARY KEY,
+    nilai     text NOT NULL,
+    diubah_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS ${sql(skema + '.cermin_header')} (
+    sheet        text PRIMARY KEY,
+    tabel        text NOT NULL,
+    headers      text[] NOT NULL,
+    tipe         jsonb NOT NULL DEFAULT '{}'::jsonb,
+    jumlah_baris integer NOT NULL,
+    sidik        text NOT NULL,
+    sinkron_at   timestamptz NOT NULL DEFAULT now()
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS ${sql(skema + '.cermin_log')} (
+    id           bigserial PRIMARY KEY,
+    sheet        text NOT NULL,
+    mulai_at     timestamptz NOT NULL,
+    selesai_at   timestamptz NOT NULL DEFAULT now(),
+    jumlah_baris integer,
+    sidik        text,
+    galat        text
+  )`;
+  // Cermin hanya dibaca Worker lewat RPC bertoken. Pengguna anonim tidak boleh masuk skema ini.
+  await sql`REVOKE ALL ON SCHEMA ${sql(skema)} FROM anon, authenticated`;
+}
+
+async function siapkanTabel(tx, skema, tabel, headers) {
+  await tx`CREATE TABLE IF NOT EXISTS ${tx(`${skema}.${tabel}`)} (
+    baris      integer PRIMARY KEY,
+    nilai      jsonb   NOT NULL,
+    data       jsonb   NOT NULL,
+    sinkron_at timestamptz NOT NULL DEFAULT now()
+  )`;
+  const kolom = (await tx`SELECT column_name FROM information_schema.columns
+                          WHERE table_schema = ${skema} AND table_name = ${tabel}`).map((r) => r.column_name);
+  if (!['baris', 'nilai', 'data'].every((k) => kolom.includes(k))) {
+    throw new Error(`tabel ${skema}.${tabel} sudah ada dengan bentuk lain (${kolom.join(', ')}), tidak disentuh`);
+  }
+  const indeks = (await tx`SELECT indexdef FROM pg_indexes WHERE schemaname = ${skema} AND tablename = ${tabel}`).map((r) => r.indexdef);
+  for (const k of KOLOM_KUNCI.filter((k) => headers.includes(k) && !indeks.some((d) => d.includes(`'${k}'::text`)))) {
+    await tx.unsafe(`CREATE INDEX IF NOT EXISTS ${ident(`${tabel}_${k}_idx`)} ON ${ident(skema)}.${ident(tabel)} ((data->>'${k}'))`);
+  }
+}
+
 // ── Utama ────────────────────────────────────────────────────────────────────
 async function utama() {
   const kering = Boolean(arg.kering);
-  const id = wajib('SUM_SPREADSHEET_ID');
+  const skema = typeof arg.skema === 'string' ? arg.skema : '';
+  if (!/^[a-z][a-z0-9_]*$/.test(skema)) throw new Error('--skema wajib diisi, misalnya --skema=sum');
+  const id = wajib(`${skema.toUpperCase()}_SPREADSHEET_ID`);
+  const lewati = new Set(String(arg.lewati ?? LEWATI_BAWAAN).split(',').map((s) => s.trim()).filter(Boolean));
+
   const { token, email } = await aksesToken(wajib('GOOGLE_SA_KEY_FILE'));
   const meta = await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${id}`
     + '?fields=properties(title,timeZone),sheets(properties(title,gridProperties(rowCount)))', token);
   const zona = meta.properties.timeZone;
-  console.log(`Spreadsheet: "${meta.properties.title}" · zona waktu ${zona} · akun layanan ${email}`);
+  console.log(`Spreadsheet: "${meta.properties.title}" · skema ${skema} · zona waktu ${zona} · akun layanan ${email}`);
   if (zona !== 'Asia/Jakarta') console.log(`  PERHATIAN: zona waktu spreadsheet ${zona}, sedangkan skrip GAS memakai Asia/Jakarta.`);
 
-  const ada = new Map(meta.sheets.map((s) => [s.properties.title, s.properties.gridProperties.rowCount]));
-  const target = arg.sheet ? [arg.sheet] : Object.keys(SHEET_KE_TABEL);
+  const semua = meta.sheets.map((s) => ({
+    judul: s.properties.title, grid: s.properties.gridProperties.rowCount, tabel: keTabel(s.properties.title),
+  }));
+  const target = arg.sheet ? semua.filter((s) => s.judul === arg.sheet) : semua;
+  if (arg.sheet && target.length === 0) throw new Error(`sheet "${arg.sheet}" tidak ada di spreadsheet`);
+  const kembar = new Set(semua.map((s) => s.tabel).filter((t, i, a) => a.indexOf(t) !== i));
 
   let sql = null;
   if (!kering) {
     const { default: postgres } = await import('postgres');
-    sql = postgres(wajib('DATABASE_URL'), { max: 1, prepare: false, ssl: 'require', connect_timeout: 20 });
+    sql = postgres(wajib('DATABASE_URL'), { max: 1, prepare: false, ssl: 'require', connect_timeout: 20, onnotice: () => {} });
+    await siapkanSkema(sql, skema);
   }
 
   const ringkas = [];
-  for (const judul of target) {
-    const tabel = SHEET_KE_TABEL[judul];
+  for (const { judul, grid, tabel } of target) {
     const mulaiAt = new Date();
-    if (!tabel) { ringkas.push([judul, '-', 'BUKAN SHEET CERMIN']); continue; }
-    if (!ada.has(judul)) { ringkas.push([judul, '-', 'TIDAK ADA DI SPREADSHEET']); continue; }
+    if (lewati.has(judul)) { ringkas.push([judul, '-', 'dilewati (--lewati)']); continue; }
+    if (!tabel || tabel.startsWith('cermin_') || kembar.has(tabel)) {
+      ringkas.push([judul, '-', `GAGAL: nama tabel "${tabel}" kosong, bentrok, atau kembar`]);
+      continue;
+    }
     try {
-      const { headers, rows, tipe } = await bacaSheet(id, judul, ada.get(judul), zona, token);
+      const { headers, rows, tipe } = await bacaSheet(id, judul, grid, zona, token);
       const sidik = sidikDari(headers, rows);
       if (!kering) {
         await sql.begin(async (tx) => {
-          await tx`DELETE FROM ${tx('sum.' + tabel)}`;
+          await siapkanTabel(tx, skema, tabel, headers);
+          await tx`DELETE FROM ${tx(`${skema}.${tabel}`)}`;
           for (let i = 0; i < rows.length; i += BARIS_PER_INSERT) {
             const batch = rows.slice(i, i + BARIS_PER_INSERT)
               .map((r) => ({ baris: r.baris, nilai: tx.json(r.nilai), data: tx.json(r.data) }));
-            await tx`INSERT INTO ${tx('sum.' + tabel)} ${tx(batch, 'baris', 'nilai', 'data')}`;
+            await tx`INSERT INTO ${tx(`${skema}.${tabel}`)} ${tx(batch, 'baris', 'nilai', 'data')}`;
           }
           await tx`
-            INSERT INTO sum.cermin_header (sheet, tabel, headers, tipe, jumlah_baris, sidik, sinkron_at)
+            INSERT INTO ${tx(skema + '.cermin_header')} (sheet, tabel, headers, tipe, jumlah_baris, sidik, sinkron_at)
             VALUES (${judul}, ${tabel}, ${headers}, ${tx.json(tipe)}, ${rows.length}, ${sidik}, now())
             ON CONFLICT (sheet) DO UPDATE SET tabel = EXCLUDED.tabel, headers = EXCLUDED.headers,
               tipe = EXCLUDED.tipe, jumlah_baris = EXCLUDED.jumlah_baris, sidik = EXCLUDED.sidik,
               sinkron_at = EXCLUDED.sinkron_at`;
-          await tx`INSERT INTO sum.cermin_log (sheet, mulai_at, jumlah_baris, sidik)
+          await tx`INSERT INTO ${tx(skema + '.cermin_log')} (sheet, mulai_at, jumlah_baris, sidik)
                    VALUES (${judul}, ${mulaiAt}, ${rows.length}, ${sidik})`;
         });
       }
       const campur = Object.entries(tipe).filter(([, t]) => t.startsWith('campur')).map(([h]) => h);
-      ringkas.push([judul, String(rows.length), `${headers.length} kolom · sidik ${sidik.slice(0, 12)}${campur.length ? ` · tipe campur: ${campur.join(', ')}` : ''}`]);
+      ringkas.push([judul, String(rows.length), `${tabel} · ${headers.length} kolom · sidik ${sidik.slice(0, 12)}${campur.length ? ` · tipe campur: ${campur.join(', ')}` : ''}`]);
     } catch (e) {
       ringkas.push([judul, '-', `GAGAL: ${e.message}`]);
-      if (sql) await sql`INSERT INTO sum.cermin_log (sheet, mulai_at, galat) VALUES (${judul}, ${mulaiAt}, ${e.message})`.catch(() => {});
+      if (sql) await sql`INSERT INTO ${sql(skema + '.cermin_log')} (sheet, mulai_at, galat) VALUES (${judul}, ${mulaiAt}, ${e.message})`.catch(() => {});
     }
   }
 
   if (sql) {
-    for (const [k, v] of [['spreadsheet_id', id], ['judul', meta.properties.title], ['zona_waktu', zona], ['sinkron_terakhir', new Date().toISOString()]]) {
-      await sql`INSERT INTO sum.cermin_meta (kunci, nilai, diubah_at) VALUES (${k}, ${v}, now())
-                ON CONFLICT (kunci) DO UPDATE SET nilai = EXCLUDED.nilai, diubah_at = now()`;
+    // `sinkron_terakhir` hanya dicatat kalau putaran penuh dan tidak ada sheet yang gagal.
+    const isiMeta = [['spreadsheet_id', id], ['judul', meta.properties.title], ['zona_waktu', zona], ['sheet_dilewati', [...lewati].join(',')]];
+    if (!arg.sheet && !ringkas.some(([, , ket]) => ket.startsWith('GAGAL'))) isiMeta.push(['sinkron_terakhir', new Date().toISOString()]);
+    try {
+      for (const [k, v] of isiMeta) {
+        await sql`INSERT INTO ${sql(skema + '.cermin_meta')} (kunci, nilai, diubah_at) VALUES (${k}, ${v}, now())
+                  ON CONFLICT (kunci) DO UPDATE SET nilai = EXCLUDED.nilai, diubah_at = now()`;
+      }
+    } catch (e) {
+      ringkas.push(['(cermin_meta)', '-', `GAGAL: ${e.message}`]);
     }
-    await sql.end();
+    await sql.end({ timeout: 5 }).catch(() => {});
   }
 
-  console.log(`\n${kering ? 'MODE KERING, tidak ada yang ditulis ke database' : 'Tersimpan ke skema sum'}:`);
-  for (const [s, n, ket] of ringkas) console.log(`  ${s.padEnd(22)} ${n.padStart(7)}  ${ket}`);
-  if (ringkas.some(([, , ket]) => ket.startsWith('GAGAL') || ket.startsWith('TIDAK ADA'))) process.exitCode = 1;
+  console.log(`\n${kering ? 'MODE KERING, tidak ada yang ditulis ke database' : `Tersimpan ke skema ${skema}`}:`);
+  for (const [s, n, ket] of ringkas) console.log(`  ${s.padEnd(26)} ${n.padStart(7)}  ${ket}`);
+  if (ringkas.some(([, , ket]) => ket.startsWith('GAGAL'))) process.exitCode = 1;
 }
 
 utama().catch((e) => { console.error(`Berhenti: ${e.message}`); process.exit(1); });

@@ -12,6 +12,40 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin keempat rumah tertulis di Gedung 1)
+- Berubah:
+  - **Keputusan Gabriel** (`docs/KEPUTUSAN.md`):
+    - cermin tanpa `AuditLogs` dulu; naik ke Supabase Pro nanti, kalau kode sudah berfungsi atau data sudah berat;
+    - skema lama `kmb_projek` di Gedung 1 diganti format cermin.
+  - **Alat cermin tunggal `tools/cermin/sinkron.mjs`** menggantikan ketiga alat per rumah (bug #29):
+    - daftar sheet dibaca langsung dari spreadsheet. Nama tabel adalah nama sheet dalam snake_case, dan tabel yang belum ada dibuat sendiri dengan bentuk cermin mentah;
+    - rumah dipilih dengan `--skema=<skema>`, dan ID spreadsheet diambil dari `<SKEMA>_SPREADSHEET_ID`. Rumah baru cukup satu baris env, tanpa mengubah kode;
+    - `AuditLogs` dilewati secara bawaan (`--lewati=` untuk menyalin semua);
+    - tabel yang sudah ada tapi bentuknya lain tidak disentuh;
+    - tahan kuota 429, galat 5xx, dan jaringan putus sesaat. `sinkron_terakhir` hanya dicatat kalau satu putaran penuh lulus;
+    - uji kering: hasil bacanya sama dengan alat lama. Setiap sheet yang tidak berubah punya sidik identik.
+  - **Sebelum menulis**, dari kode Worker yang tayang dipastikan:
+    - Worker SUM dan KMB TRA produksi hanya membaca Supabase lewat `?uji=supabase` (`AKSI_SUPABASE_LULUS_KEMBAR` kosong);
+    - Worker KMB Project tidak memakai Supabase;
+    - jadi mengisi cermin tidak mengubah apa yang dilihat pengguna.
+  - **Gedung 1:**
+    - skema lama `kmb_projek` (11 tabel, salinan 27 Okt) dipindah utuh ke `kmb_projek_lama`, tertutup untuk anon. Skema `kmb_projek` dibuat ulang untuk cermin;
+    - cermin keempat rumah tertulis, dan jumlah baris setiap tabel cocok dengan `cermin_header`:
+      - `sum`: 18 sheet, 138.547 baris, 109 MB;
+      - `kmb`: 23 sheet, 157.575 baris, 98 MB;
+      - `kmb_projek`: 23 sheet, 23.231 baris, 16 MB;
+      - `kmbbupr` (skema baru): 23 sheet, 12.881 baris, 8 MB;
+    - ukuran Gedung 1 245 MB (49% dari 500 MB). Semua skema cermin tertutup untuk anon;
+    - percobaan pertama terputus karena jaringan di komputer kerja. 13 sheet SUM sempat tertulis dua kali; ruang ±15 MB yang tersisa akan terpakai ulang.
+  - 9 fungsi lama `public.kmb_*` (portal lama, tidak dipakai kode produksi) masih merujuk tabel bentuk lama di `kmb_projek`. Sekarang fungsi itu akan galat kalau dipanggil.
+- Belum selesai / berikutnya:
+  - **Sinkron terjadwal.** Cermin baru disalin sekali. Hitungan "7 hari tanpa selisih" baru mulai setelah sinkron berjalan rutin. Perlu tempat menjalankannya. Usulan: GitHub Actions, lewat pooler IPv4, karena runner GitHub tidak punya IPv6.
+  - **Sinkron per baris.** Sekarang alat menghapus lalu menulis ulang setiap tabel, sehingga tabel bisa membengkak sampai ±2× isinya. Sebelum dijadwalkan sering, ubah menjadi pembaruan per baris.
+  - Fungsi `public.kmb_*` lama: tulis ulang untuk format cermin saat aksi baca KMB Project dipindah, atau cabut aksesnya dari anon.
+  - `kmb_projek_lama` boleh dihapus setelah cermin baru terbukti.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (rahasia lokal lengkap; uji kering cermin empat spreadsheet)
 - Berubah:
   - **Rahasia lokal lengkap** (`abadiops.env`, di luar repo):
