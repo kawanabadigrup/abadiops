@@ -23,7 +23,7 @@ Formatnya:
     - Bawaan `'sum'` diganti kamar pertama di `RUMAH` (sekarang `kmbprojek`), jadi tab yang pertama terbuka sekarang KMB Projek.
     - Keterangan dan label navigasi tidak lagi menyebut nama skema, awalan token, atau "3 Rumah".
     - Menambah kamar ke panel cukup lewat `config/rumah.json` dan `RUMAH`, tanpa menyentuh `saklar.html`.
-  - **BUPR di Gedung 2:** `kmbbupr` dicermin sekali, 14 Nov 01.28 WIB: 26 tabel, 12.932 baris, AuditLogs dilewati. Skema ini belum punya fungsi dan belum ikut jadwal cermin tiap jam, karena jadwal itu menulis ke Gedung 1.
+  - **BUPR di Gedung 2:** `kmbbupr` dicermin sekali, 14 Nov 01.28 WIB: 23 sheet, 12.881 baris data (ditambah 3 tabel meta cermin), AuditLogs dilewati. Skema ini belum punya fungsi dan belum ikut jadwal cermin tiap jam, karena jadwal itu menulis ke Gedung 1.
   - **Tayang di staging:** pintu `70210f5a`, sum `c286e6a7`, kmb `37ece31b`, kmbprojek `ef4e3e6b`, GAS tiruan `d3730d00`.
     - Pintu versi 1a tayang tanpa source map. Sebelum ditimpa, bundelnya dibandingkan dengan bundel uji-bangun branch dan hasilnya sama persis. Halaman panelnya juga sama dengan commit.
   - **Uji** (tidak mengubah posisi saklar ataupun data):
