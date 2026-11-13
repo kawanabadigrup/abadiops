@@ -23,7 +23,12 @@ Formatnya:
   - Diuji 13 Nov: `/cek` menjawab Gedung 2 200, dan Gedung 1 530 (masih dijeda). Cron terdaftar di akun (satu-satunya cron).
 - Belum selesai / berikutnya:
   - ~~Gabriel memulihkan Gedung 1 dari dasbor Supabase.~~ **Dipulihkan 13 Nov sore** (Resume project). `/cek` menjawab 200 untuk kedua gedung.
-  - Setelah pulih, cermin Gedung 1 perlu disinkron ulang. Isinya tertinggal: token uji 29–30 Okt tidak dikenali.
+  - Gedung 1 diperiksa langsung lewat database (13 Nov, hanya baca):
+    - **Cermin SUM dan KMB TRA kosong.** Semua tabel skema `sum` (22 tabel) dan `kmb` (24 tabel) berisi 0 baris, termasuk `cermin_meta` dan `cermin_log`, jadi keduanya belum pernah disinkron ke Gedung 1.
+    - **Cermin KMB Project sudah lama.** Isinya baru sekali dimuat, 27 Okt (16 WO, 51 arsip, 20 token, 1.533 katalog job).
+    - **Ukuran database Gedung 1 hanya 15 MB.** Angka 374/500 MB di halaman organisasi bukan dari Gedung 1.
+    - **Fungsi admin dan eksekusi Raka tidak ada** di Gedung 1.
+  - Berikutnya, sinkron cermin ketiga rumah ke Gedung 1 (`tools/<rumah>/sinkron-cermin.mjs`, mulai dengan `--kering`). Untuk itu dibutuhkan kunci JSON akun layanan dan ID spreadsheet SUM serta KMB TRA.
 
 ---
 
