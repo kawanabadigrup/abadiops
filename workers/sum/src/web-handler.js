@@ -32,8 +32,9 @@ const ROUTER_ACTIONS = new Set([
   'supervisorReject', 'handleSupervisorReject',
   'superintendentApprove', 'handleSuperintendentApprove',
   'superintendentReject', 'handleSuperintendentReject',
-  'handleCancelWO', 'cancelWO',
-  'handleOverrideTargetHours', 'handleSaveOverride',
+  'handleCancelWO', 'cancelWO', 'cancel_wo', 'batalkan_wo',
+  'handleDaftarCancelWo', 'getDaftarCancelWo', 'pull_cancelable', 'daftarCancelWo',
+  'handleOverrideTargetHours', 'handleSaveOverride', 'save_override', 'saveOverride', 'overrideAndApprove', 'override_and_approve',
   'handleApproveTransfer', 'handleRejectTransfer',
   'handleKembalikanKeMekanik', 'handleBulkApprove',
   'loadJobsCatalog', 'getJobCatalogCached',
@@ -60,7 +61,32 @@ function formatTanggalWIB(rawDate) {
   }
 }
 
-function lengkapiObjekWoWeb(w) {
+const NAMA_MEKANIK_KNOWN = {
+  'VES-004': 'Rahmat', 'VES-005': 'Aji Laksono', 'VES-007': 'Bayu Aji', 'VES-008': 'Dimas',
+  'VES-009': 'Cahyo Aji', 'VES-010': 'Aditya', 'VES-011': 'Yudo Hardianto', 'VES-012': 'Gusti Raka Pamungkas',
+  'VES-013': 'Nicko Herman Saputra', 'VES-014': 'Wahmi Yogo Prastowo',
+  'MNT-002': 'Mekanik Maintenance 2', 'MNT-003': 'Afid Irham', 'MNT-004': 'M. Riyanto',
+  'MNT-005': 'Wiwit', 'MNT-006': 'Eliyadi', 'MNT-007': 'Aldo Noviansyah', 'MNT-008': 'Rido Saputra',
+  'MNT-009': 'Alan Rohim', 'MNT-010': 'Bagus Wahyu Nurcahyo', 'MNT-011': 'Regista Pratama',
+  'MNT-012': 'Khoirul Musthofa', 'MNT-013': 'Syukur Kurniadi', 'GW-user': 'ra',
+  'MECH-SVP-005': 'Mekanik SVP 05', 'MECH-SVP-028': 'Mekanik SVP 28', 'MECH-01': 'Mekanik',
+  'MECH-SUM-001': 'Mekanik SUM Utama', 'SPV-SUM-001': 'Supervisor SUM',
+  'MECH-TRA-001': 'Mekanik TRA Utama', 'SPV-TRA-001': 'Supervisor TRA',
+  'MECH-KMBP-001': 'Mekanik Project Utama', 'SPV-KMBP-001': 'Supervisor KMB Project',
+  'UJI-01': 'raka l2', 'UJI-ADM-001': 'Uji Supervisor Staging',
+};
+
+function resolveNamaMekanik(idOrName, mechMap) {
+  if (!idOrName) return '';
+  const s = String(idOrName).trim();
+  if (mechMap && typeof mechMap.get === 'function' && mechMap.get(s)) return mechMap.get(s);
+  if (mechMap && typeof mechMap.get === 'function' && mechMap.get(s.toUpperCase())) return mechMap.get(s.toUpperCase());
+  if (NAMA_MEKANIK_KNOWN[s]) return NAMA_MEKANIK_KNOWN[s];
+  if (NAMA_MEKANIK_KNOWN[s.toUpperCase()]) return NAMA_MEKANIK_KNOWN[s.toUpperCase()];
+  return s;
+}
+
+function lengkapiObjekWoWeb(w, mechMap) {
   if (!w || typeof w !== 'object') return {};
   const d = (w.data && typeof w.data === 'object') ? w.data : {};
   const id = String(w.id || w.wo_id || w.wo_number || d.id || d.wo_id || d.wo_number || 'WO-0');
@@ -110,13 +136,28 @@ function lengkapiObjekWoWeb(w) {
     validOrEmpty(w.job_description) ||
     validOrEmpty(component_id) ||
     'Pekerjaan';
-  const base_points = Number(w.base_points ?? w.points ?? compObj.base_points ?? 1.0);
-  const target_hours = Number(w.target_hours ?? compObj.target_hours ?? 2.0);
-  const effective_base_points = Number(w.effective_base_points ?? base_points);
-  const effective_target_hours = Number(w.effective_target_hours ?? target_hours);
+  // Override Overlay (Prioritaskan nilai override jika WO telah di-override)
+  const rawOv = (d.override && typeof d.override === 'object')
+    ? d.override
+    : ((w.override && typeof w.override === 'object')
+      ? w.override
+      : ((d.override_data && typeof d.override_data === 'object')
+        ? d.override_data
+        : ((w.override_data && typeof w.override_data === 'object') ? w.override_data : null)));
+  const ov = rawOv ? { ...(typeof rawOv.override_data === 'object' ? rawOv.override_data : {}), ...rawOv } : null;
+
+  const is_overridden = Boolean(ov || w.is_overridden || d.is_overridden || w.has_override || d.has_override);
+  const override_reason = String((ov && (ov.override_reason || ov.judgment || ov.catatan || ov.notes)) || w.override_reason || d.override_reason || '').trim();
+  const overridden_by = String((ov && ov.overridden_by) || d.override_by || w.override_by || '').trim();
+  const overridden_at = String((ov && ov.overridden_at) || d.override_at || w.override_at || '').trim();
+
+  let base_points = Number((ov && ov.base_points) ?? w.base_points ?? w.points ?? compObj.base_points ?? 1.0);
+  let target_hours = Number((ov && ov.target_hours) ?? w.target_hours ?? compObj.target_hours ?? 2.0);
+  let effective_base_points = Number(base_points);
+  let effective_target_hours = Number(target_hours);
 
   // Normalisasi kondisi kerja & faktor pengali
-  const rawCond = String(w.work_condition || d.work_condition || 'normal').toLowerCase();
+  const rawCond = String((ov && ov.work_condition) || w.work_condition || d.work_condition || 'normal').toLowerCase();
   let cond_factor = 1.0;
   let work_condition = 'Normal';
   if (rawCond === 'extreme' || rawCond.includes('ekstrim') || rawCond.includes('resiko tinggi')) {
@@ -128,11 +169,11 @@ function lengkapiObjekWoWeb(w) {
   }
 
   // Jam kerja aktual
-  let actual_hours = Number(w.actual_hours ?? d.actual_hours ?? w.duration_hours ?? d.duration_hours);
+  let actual_hours = Number((ov && ov.actual_hours) ?? w.actual_hours ?? d.actual_hours ?? w.duration_hours ?? d.duration_hours);
   if (!Number.isFinite(actual_hours) || actual_hours < 0) actual_hours = 0;
-  if (actual_hours <= 0 && w.start_time && w.end_time) {
-    const s = new Date(w.start_time).getTime();
-    const e = new Date(w.end_time).getTime();
+  if (actual_hours <= 0 && ((ov && ov.start_time && ov.end_time) || (w.start_time && w.end_time))) {
+    const s = new Date((ov && ov.start_time) || w.start_time).getTime();
+    const e = new Date((ov && ov.end_time) || w.end_time).getTime();
     if (!isNaN(s) && !isNaN(e) && e > s) {
       actual_hours = Math.round(((e - s) / 3600000) * 100) / 100;
     }
@@ -142,22 +183,24 @@ function lengkapiObjekWoWeb(w) {
   }
 
   // Poin & Rupiah (Pastikan tidak pernah 0 atau kosong di UI!)
-  let rawFinalPts = Number(w.final_points ?? d.final_points ?? w.points ?? d.points);
+  let rawFinalPts = Number((ov && ov.final_points) ?? w.final_points ?? d.final_points ?? w.points ?? d.points);
   let final_points = (Number.isFinite(rawFinalPts) && rawFinalPts > 0) ? rawFinalPts : Math.round((base_points * unit_factor * cond_factor) * 100) / 100;
   if (!final_points || final_points <= 0) final_points = 1.0;
 
-  let rawFinalIdr = Number(w.final_idr ?? d.final_idr);
+  let rawFinalIdr = Number((ov && ov.final_idr) ?? w.final_idr ?? d.final_idr);
   let final_idr = (Number.isFinite(rawFinalIdr) && rawFinalIdr > 0) ? rawFinalIdr : Math.round(final_points * 2500);
   if (!final_idr || final_idr <= 0) final_idr = Math.round(final_points * 2500);
 
   // Tim & Pembagian Poin / IDR
-  let team = Array.isArray(w.team) ? w.team : (Array.isArray(d.team) ? d.team : (Array.isArray(w.effective_team) ? w.effective_team : []));
+  let team = (ov && Array.isArray(ov.team) && ov.team.length > 0)
+    ? ov.team
+    : (Array.isArray(w.team) ? w.team : (Array.isArray(d.team) ? d.team : (Array.isArray(w.effective_team) ? w.effective_team : [])));
   const teamDist = w.team_distribution || d.team_distribution;
   if (!team.length && teamDist && typeof teamDist === 'object') {
     team = Object.entries(teamDist).map(([mid, pct]) => ({
       mechanic_id: String(mid).trim(),
-      mechanic_name: String(mid).trim(),
-      name: String(mid).trim(),
+      mechanic_name: resolveNamaMekanik(mid, mechMap),
+      name: resolveNamaMekanik(mid, mechMap),
       percentage: Number(pct) || 100,
     }));
   }
@@ -181,7 +224,8 @@ function lengkapiObjekWoWeb(w) {
   const leadId = w.lead_mechanic_id || d.lead_mechanic_id || w.mechanic_id || d.mechanic_id;
   const leadName = w.mechanic_name || d.mechanic_name || w.lead_mechanic_name || d.lead_mechanic_name || (w.created_by ? String(w.created_by).split('@')[0] : '') || (w.submitted_by ? String(w.submitted_by).split('@')[0] : '') || leadId;
   if (!team.length && leadName) {
-    team = [{ mechanic_id: String(leadId || leadName), mechanic_name: String(leadName), name: String(leadName), percentage: 100 }];
+    const resolvedLead = resolveNamaMekanik(leadName, mechMap);
+    team = [{ mechanic_id: String(leadId || leadName), mechanic_name: String(resolvedLead), name: String(resolvedLead), percentage: 100 }];
   }
   if (!team.length) {
     team = [{ mechanic_id: 'MECH-01', mechanic_name: 'Mekanik', name: 'Mekanik', percentage: 100 }];
@@ -194,7 +238,8 @@ function lengkapiObjekWoWeb(w) {
     const mRole = String(m.role || m.position || '').toLowerCase();
     const mRate = (mRole.includes('sr') || mRole.includes('senior')) ? 3000 : 2500;
     const mIdr = Math.round(mPoints * mRate);
-    const mName = String(m.mechanic_name || m.name || m.mechanic_id || m.id || 'Mekanik').trim();
+    const mRawName = String(m.mechanic_name || m.name || m.mechanic_id || m.id || 'Mekanik').trim();
+    const mName = resolveNamaMekanik(mRawName, mechMap);
     return {
       ...m,
       mechanic_id: String(m.mechanic_id || m.id || mName),
@@ -241,6 +286,11 @@ function lengkapiObjekWoWeb(w) {
     final_points,
     final_idr,
     points: final_points,
+    is_overridden,
+    has_override: is_overridden,
+    override_reason,
+    overridden_by,
+    overridden_at,
     component: {
       component_no: component_id,
       component_id,
@@ -253,7 +303,46 @@ function lengkapiObjekWoWeb(w) {
     effective_team: team,
     team_names,
     team_count: team.length,
+    mechanics: team.map(m => m.mechanic_name || m.name).filter(Boolean).join(', ') || resolveNamaMekanik(leadName, mechMap) || resolveNamaMekanik(leadId, mechMap) || '-',
+    created_by_name: (() => {
+      let rawCreator = w.created_by_name || d.created_by_name || w.created_by || d.created_by || w.creator_name || d.creator_name || w.requester || d.requester || w.foreman || d.foreman || w.supervisor || d.supervisor || w.approved_by_l1 || d.approved_by_l1 || '';
+      let res = '';
+      if (rawCreator) {
+        let s = String(rawCreator).trim();
+        if (s.includes('@')) s = s.split('@')[0];
+        res = resolveNamaMekanik(s, mechMap) || s;
+      }
+      return res || (w.submitted_by ? String(w.submitted_by).split('@')[0] : '') || 'PIC Lapangan';
+    })(),
+    created_at: (() => {
+      let raw = w.created_at || d.created_at || w.date || d.date || w.submitted_at || d.submitted_at || '';
+      let dt = raw ? new Date(raw) : null;
+      if (!dt || isNaN(dt.getTime())) {
+        const match = String(wo_number).match(/WO-(\d{4})(\d{2})(\d{2})/i);
+        if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+        return new Date().toISOString().slice(0, 10);
+      }
+      return raw;
+    })(),
     created_at_str,
+    judgment: (() => {
+      let rawJd = String((ov && (ov.judgment || ov.override_reason || ov.catatan || ov.notes)) || w.judgment || d.judgment || w.evaluation || d.evaluation || override_reason || '').trim();
+      if (!rawJd) {
+        if (actual_hours > 0 && target_hours > 0) {
+          if (actual_hours <= 0.8 * target_hours) rawJd = 'Fast (Efisien)';
+          else if (actual_hours <= target_hours) rawJd = 'On Target';
+          else {
+            const diff = Math.round((actual_hours - target_hours) * 10) / 10;
+            rawJd = `Overtime (+${diff} jam)`;
+          }
+        } else if (st === 'approved' || sg === 'done') {
+          rawJd = 'Sesuai Target';
+        } else {
+          rawJd = '—';
+        }
+      }
+      return rawJd;
+    })(),
   };
 }
 
@@ -379,7 +468,13 @@ export async function handleWebRequest(request, env, url) {
       const myWosData = myWos && myWos.result ? myWos.result : (myWos && myWos.data ? myWos.data : {});
       const monData = mon && mon.result ? mon.result : (mon && mon.data ? mon.data : {});
       const rawWosList = myWosData.wos || (Array.isArray(myWosData) ? myWosData : []);
-      const enrichedWos = rawWosList.map(lengkapiObjekWoWeb);
+      // WO yang dibatalkan (cancelled/rejected) otomatis hilang dari halaman pengerjaan mekanik
+      const activeWosOnly = rawWosList.filter(w => {
+        const st = String(w.status || '').toLowerCase().trim();
+        const sg = String(w.status_group || '').toLowerCase().trim();
+        return !['cancelled', 'canceled', 'rejected', 'batal'].includes(st) && sg !== 'rejected';
+      });
+      const enrichedWos = activeWosOnly.map(lengkapiObjekWoWeb);
       const computedCounts = myWosData.counts || {
         all: enrichedWos.length,
         assigned: enrichedWos.filter((w) => w.status_group === 'assigned').length,
@@ -401,13 +496,119 @@ export async function handleWebRequest(request, env, url) {
       context.monitoringData = monData;
       context.mons = (monData && monData.mechanics) || (Array.isArray(monData) ? monData : []);
     } else if (['dashboard', 'main'].includes(page)) {
-      const mon = await panggilAksiInternal('pull_monitoring', token, {}, env);
-      const monData = mon && mon.result ? mon.result : (mon && mon.data ? mon.data : {});
+      const [mon, pending, active, approved, rejected] = await Promise.all([
+        panggilAksiInternal('pull_monitoring', token, {}, env),
+        panggilAksiInternal('pull_pending', token, {}, env),
+        panggilAksiInternal('pull_active', token, {}, env),
+        panggilAksiInternal('pull_approved', token, {}, env),
+        panggilAksiInternal('pull_rejected', token, {}, env),
+      ]);
+      const ekstrakIsi = (x) => (x && x.result ? x.result : (x && x.data ? x.data : (Array.isArray(x) ? x : {})));
+      const dmon = ekstrakIsi(mon);
+      const dp = ekstrakIsi(pending);
+      const da = ekstrakIsi(active);
+      const dap = ekstrakIsi(approved);
+      const dr = ekstrakIsi(rejected);
+      const ov = dmon.overall || {};
+      const mechsArr = Array.isArray(dmon) ? dmon : (Array.isArray(dmon?.mechanics) ? dmon.mechanics : []);
+
+      // Kamus Mekanik Dinamis
+      const mechMap = new Map();
+      if (Array.isArray(mechsArr)) {
+        mechsArr.forEach(m => {
+          const mid = m.mechanic_id || m.id;
+          const mname = m.name || m.mechanic_name;
+          if (mid && mname) {
+            mechMap.set(String(mid).trim().toUpperCase(), mname);
+            mechMap.set(String(mid).trim(), mname);
+          }
+        });
+      }
+
+      const saringWoSah = (arr) => (Array.isArray(arr) ? arr : []).filter((x) => x && typeof x === 'object' && (x.id || x.wo_id || x.wo_number) && String(x.wo_number || x.id) !== 'WO-0');
+      const listPending = saringWoSah(dp.pending || dp.wos || (Array.isArray(dp) ? dp : [])).map(w => lengkapiObjekWoWeb(w, mechMap));
+      const listActive = saringWoSah(da.active || da.wos || (Array.isArray(da) ? da : [])).map(w => lengkapiObjekWoWeb(w, mechMap));
+      const listApproved = saringWoSah(dap.approved || dap.wos || (Array.isArray(dap) ? dap : [])).map(w => lengkapiObjekWoWeb(w, mechMap));
+      const listRejected = saringWoSah(dr.rejected || dr.wos || (Array.isArray(dr) ? dr : [])).map(w => lengkapiObjekWoWeb(w, mechMap));
+
+      const petaWo = new Map();
+      [...listPending, ...listActive, ...listApproved, ...listRejected].forEach((w) => {
+        const k = String(w.wo_number || w.id);
+        if (k && !petaWo.has(k)) petaWo.set(k, w);
+      });
+      const semuaWo = Array.from(petaWo.values()).sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+      // Leaderboard
+      const petaMekanik = new Map();
+      listApproved.forEach((w) => {
+        (w.team || []).forEach((m) => {
+          const mid = String(m.mechanic_id || m.id || m.mechanic_name || m.name || 'MECH-01');
+          const mname = resolveNamaMekanik(m.mechanic_name || m.name || mid, mechMap);
+          const pts = Number(m.share_points ?? w.final_points ?? 0);
+          const cur = petaMekanik.get(mid) || { id: mid, mechanic_id: mid, name: mname, mechanic_name: mname, total_points: 0, points: 0, wo_count: 0, count: 0 };
+          cur.total_points = Number((cur.total_points + pts).toFixed(2));
+          cur.points = cur.total_points;
+          cur.wo_count += 1;
+          cur.count += 1;
+          petaMekanik.set(mid, cur);
+        });
+      });
+      const leaderboard = Array.from(petaMekanik.values()).sort((a, b) => b.total_points - a.total_points);
+
+      // Trend Poin 7 Hari Terakhir
+      const trendMap = new Map();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        const k = d.toISOString().slice(5, 10);
+        trendMap.set(k, 0);
+      }
+      listApproved.forEach((w) => {
+        const t = String(w.created_at || w.date || '').slice(5, 10);
+        if (trendMap.has(t)) {
+          trendMap.set(t, Number((trendMap.get(t) + Number(w.final_points || 0)).toFixed(2)));
+        }
+      });
+
+      const totalPoints = listApproved.reduce((s, w) => s + Number(w.final_points || 0), 0);
+      const woBerjam = semuaWo.filter((w) => Number(w.actual_hours) > 0);
+      const avgJam = woBerjam.length > 0 ? Number((woBerjam.reduce((s, w) => s + Number(w.actual_hours), 0) / woBerjam.length).toFixed(1)) : 0;
+
+      // Perhitungan Metrik KPI yang Konsisten & Matematis (TOTAL WO >= APPROVED + PENDING):
+      const countApproved = listApproved.length;
+      const countPending = listPending.length + listActive.length;
+      const countTotal = Math.max(semuaWo.length, countApproved + countPending);
+
       context.dashboardData = {
-        user: user,
-        stats: (monData && monData.stats) || { totalWOs: 0, approved: 0, pending: 0, totalPoints: 0 },
-        recentWOs: (monData && monData.recentWOs ? monData.recentWOs : []).map(lengkapiObjekWoWeb),
-        charts: (monData && monData.charts) || { pointsTrend: { labels: [], data: [] } },
+        user,
+        periode: dmon.periode || 'Bulan Berjalan',
+        periodeLabel: dmon.periode || 'Bulan Berjalan',
+        stats: {
+          totalWOs: countTotal,
+          approved: countApproved,
+          pending: countPending,
+          totalPoints: Number(totalPoints.toFixed(2)),
+          activeMechanics: mechsArr.length || (ov.total_mechanics || ov.mechanics || 0),
+          thisMonth: countTotal,
+          avgCompletion: avgJam,
+          avgCompletionLabel: avgJam > 0 ? `${avgJam} jam` : '—',
+          mechanicsByGrade: (dmon.stats && dmon.stats.mechanicsByGrade) || [],
+        },
+        recentWOs: semuaWo.slice(0, 30),
+        leaderboard,
+        submitLeaderboard: leaderboard.map((x) => ({ ...x, submit_count: x.wo_count })),
+        leaderboardHarian: {
+          tanggal: new Date().toISOString().slice(0, 10),
+          label: 'Hari Ini',
+          vessel: { nama: 'Rekondisi', jumlah_wo: listApproved.filter((w) => w.section === 'vessel').length, baris: leaderboard.slice(0, 5) },
+          maintenance: { nama: 'Maintenance', jumlah_wo: listApproved.filter((w) => w.section !== 'vessel').length, baris: leaderboard.slice(0, 5) },
+        },
+        charts: dmon.charts || {
+          pointsTrend: {
+            labels: Array.from(trendMap.keys()),
+            data: Array.from(trendMap.values()),
+            periodeLabel: 'Bulan Berjalan',
+          },
+        },
       };
     }
   } catch (err) {

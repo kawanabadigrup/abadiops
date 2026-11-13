@@ -76,7 +76,7 @@ export async function buildPayrollWorkbook({ periodLabel, generatedAt, summaryRo
   const titleCell1 = ws1.getCell('A1');
   titleCell1.value = 'LAPORAN PAYROLL INSENTIF MEKANIK';
   titleCell1.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-  titleCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' }, bgColor: { argb: 'FFF59E0B' } };
+  titleCell1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' }, bgColor: { argb: 'FFF97316' } };
   titleCell1.alignment = { horizontal: 'center', vertical: 'middle' };
 
   // Row 2..4: Metadata
@@ -99,7 +99,7 @@ export async function buildPayrollWorkbook({ periodLabel, generatedAt, summaryRo
     const c = ws1.getCell(headerRow1, idx + 1);
     c.value = h;
     c.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' } };
-    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' }, bgColor: { argb: 'FFF59E0B' } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' }, bgColor: { argb: 'FFF97316' } };
     c.alignment = { horizontal: 'center', vertical: 'middle' };
     c.border = {
       top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -161,7 +161,7 @@ export async function buildPayrollWorkbook({ periodLabel, generatedAt, summaryRo
   const totalRowIdx1 = headerRow1 + 1 + summaryRows.length;
   for (let c = 1; c <= 8; c++) {
     const cell = ws1.getCell(totalRowIdx1, c);
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' }, bgColor: { argb: 'FFF59E0B' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' }, bgColor: { argb: 'FFF97316' } };
     cell.font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' } };
     cell.border = {
       top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -208,7 +208,7 @@ export async function buildPayrollWorkbook({ periodLabel, generatedAt, summaryRo
   const titleCell2 = ws2.getCell('A1');
   titleCell2.value = 'DETAIL WO PER MEKANIK — ' + periodLabel;
   titleCell2.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-  titleCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' }, bgColor: { argb: 'FFF59E0B' } };
+  titleCell2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' }, bgColor: { argb: 'FFF97316' } };
   titleCell2.alignment = { horizontal: 'center', vertical: 'middle' };
 
   // Row 2..3: Metadata
@@ -243,7 +243,7 @@ export async function buildPayrollWorkbook({ periodLabel, generatedAt, summaryRo
       right: { style: 'thin', color: { argb: 'FF000000' } }
     };
 
-    let bgArgb = 'FFF59E0B'; // cols 1..13
+    let bgArgb = 'FFF97316'; // cols 1..13
     if (colNumber === 14 || colNumber === 15) bgArgb = 'FF4B5563'; // Actual Hours, Plan Hours
     else if (colNumber >= 16 && colNumber <= 21) bgArgb = 'FFAD1457'; // Base Pts .. xRedo
     else if (colNumber >= 22 && colNumber <= 25) bgArgb = 'FFB45309'; // WO Poin .. IDR

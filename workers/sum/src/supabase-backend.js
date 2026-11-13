@@ -132,7 +132,17 @@ function normalisasiAksi(action) {
     'handleCancelWO': 'cancel_wo',
     'cancelWO': 'cancel_wo',
     'batalkan_wo': 'cancel_wo',
+    'cancel_wo': 'cancel_wo',
+    'handleDaftarCancelWo': 'pull_cancelable',
+    'getDaftarCancelWo': 'pull_cancelable',
+    'pull_cancelable': 'pull_cancelable',
+    'daftarCancelWo': 'pull_cancelable',
     'handleSaveOverride': 'save_override',
+    'saveOverride': 'save_override',
+    'save_override': 'save_override',
+    'overrideAndApprove': 'save_override',
+    'override_and_approve': 'save_override',
+    'override': 'save_override',
     'handleOverrideTargetHours': 'save_override',
     'handleApproveTransfer': 'approve_transfer',
     'handleRejectTransfer': 'reject_transfer',
@@ -315,7 +325,7 @@ export async function eksekusiSupabaseBackendSum(action, token, body, env) {
     'Content-Type': 'application/json',
   };
 
-  const rumah = (env.RUMAH || 'kmbprojek').toLowerCase();
+  const rumah = (env.RUMAH || 'sum').toLowerCase();
   const rpcPrefix = (rumah === 'sum') ? 'sum' : (rumah === 'kmbtra' || rumah === 'kmb') ? 'kmbtra' : 'kmb';
   const rpcUrl = `${env.SUPABASE_URL}/rest/v1/rpc/${rpcPrefix}_eksekusi_aksi_bertoken`;
 
@@ -390,10 +400,13 @@ export async function eksekusiSupabaseBackendSum(action, token, body, env) {
     });
   }
 
-  // Siapkan payload
-  let payload = body.data || body.payload || body;
+  // Siapkan payload (gabungkan body dan body.data agar parameter tidak tercecer)
+  let payload = (typeof body.data === 'object' && body.data !== null) ? { ...body, ...body.data } : (body.payload || body || {});
   if (typeof payload !== 'object' || payload === null) {
     payload = {};
+  }
+  if (body.override_data && typeof body.override_data === 'object') {
+    payload = { ...payload, ...body.override_data };
   }
 
   if (cleanAksi === 'create_wo') {
@@ -406,6 +419,9 @@ export async function eksekusiSupabaseBackendSum(action, token, body, env) {
 
   if (['pull_wo_detail', 'getWODetails', 'getWoDetailForMechanic', 'handleGetWoDetailForMechanic', 'approve_l1', 'approve_l2', 'reject', 'cancel_wo', 'save_override', 'approve_transfer', 'reject_transfer', 'submit_work', 'request_transfer', 'report_expired'].includes(cleanAksi)) {
     payload.wo_id = payload.wo_id || payload.id || ekstrakWoId(body) || ekstrakWoId(payload);
+    if (cleanAksi === 'cancel_wo') {
+      payload.reason = payload.reason || payload.alasan || body.reason || body.alasan || 'Dibatalkan oleh pembuat';
+    }
   }
 
   // Jika submit work, pastikan status & status_group disetel ke pending_approval
@@ -454,6 +470,38 @@ export async function eksekusiSupabaseBackendSum(action, token, body, env) {
     payload.final_points = (Number(payload.final_points) > 0) ? Number(payload.final_points) : calcPts;
     payload.final_idr = (Number(payload.final_idr) > 0) ? Number(payload.final_idr) : Math.round(payload.final_points * 2500);
     payload.points = payload.final_points;
+  }
+
+  // Khusus save_override: unpack override_data dan hitung poin live
+  if (cleanAksi === 'save_override') {
+    if (payload.override_data && typeof payload.override_data === 'object') {
+      payload = { ...payload, ...payload.override_data };
+    }
+    payload.wo_id = payload.wo_id || payload.id || ekstrakWoId(body) || ekstrakWoId(payload);
+    payload.is_overridden = true;
+    payload.has_override = true;
+
+    if (payload.target_hours_jam !== undefined || payload.target_hours_menit !== undefined) {
+      payload.target_hours = Number(payload.target_hours_jam || 0) + (Number(payload.target_hours_menit || 0) / 60);
+    }
+
+    if (payload.start_time && payload.end_time && !payload.actual_hours) {
+      const stMs = new Date(payload.start_time).getTime();
+      const etMs = new Date(payload.end_time).getTime();
+      if (!isNaN(stMs) && !isNaN(etMs) && etMs > stMs) {
+        payload.actual_hours = Number(((etMs - stMs) / 3600000).toFixed(2));
+        payload.duration_hours = payload.actual_hours;
+      }
+    }
+    const basePts = Number(payload.base_points || 1.0) || 1.0;
+    const unitF = Number(payload.unit_factor || 1.0) || 1.0;
+    const rawCond = String(payload.work_condition || 'normal').toLowerCase();
+    const condF = (rawCond === 'extreme' || rawCond.includes('ekstrim') || rawCond.includes('resiko')) ? 1.2 : ((rawCond === 'difficult' || rawCond.includes('berat') || rawCond.includes('malam') || rawCond.includes('hujan')) ? 1.1 : 1.0);
+    const calcPts = Math.round((basePts * unitF * condF) * 100) / 100;
+    payload.final_points = (Number(payload.final_points) > 0) ? Number(payload.final_points) : calcPts;
+    payload.final_idr = (Number(payload.final_idr) > 0) ? Number(payload.final_idr) : Math.round(payload.final_points * 2500);
+    payload.points = payload.final_points;
+    payload.override_reason = payload.override_reason || payload.judgment || payload.notes || 'Penyesuaian oleh approver';
   }
 
   if (cleanAksi === 'request_transfer') {
@@ -869,6 +917,111 @@ export async function eksekusiSupabaseBackendSum(action, token, body, env) {
         };
         data.data = l2Data;
         data.result = l2Data;
+      } else if (cleanAksi === 'save_override' && data.success) {
+        if (payload.and_approve) {
+          // Jika diminta and_approve, jalankan approve L1 atau L2 sesuai hak akses / status
+          const targetWoId = payload.wo_id || data.wo_id || '';
+          const approveAksi = (body.user_role === 'superintendent' || payload.role === 'superintendent') ? 'approve_l2' : 'approve_l1';
+          try {
+            await fetch(rpcUrl, {
+              method: 'POST',
+              headers: supaHeaders,
+              body: JSON.stringify({
+                p_token: cleanToken,
+                p_aksi: approveAksi,
+                p_op_id: 'ov-appr-' + Date.now(),
+                p_payload: {
+                  wo_id: targetWoId,
+                  final_points: payload.final_points,
+                  final_idr: payload.final_idr,
+                  points: payload.final_points,
+                },
+                p_extra: null,
+              }),
+            });
+          } catch (_) {}
+        }
+        const ovResult = {
+          wo_id: payload.wo_id || data.wo_id || '',
+          wo_number: payload.wo_id || data.wo_id || '',
+          is_overridden: true,
+          and_approved: Boolean(payload.and_approve),
+          base_points: payload.base_points,
+          target_hours: payload.target_hours,
+          actual_hours: payload.actual_hours,
+          final_points: payload.final_points,
+          final_idr: payload.final_idr,
+          work_condition: payload.work_condition,
+          override_reason: payload.override_reason,
+          ...(data.data || data.result || {})
+        };
+        data.data = ovResult;
+        data.result = ovResult;
+      } else if (cleanAksi === 'pull_cancelable' && data.result) {
+        const rawList = Array.isArray(data.result) ? data.result : (data.result.wos || data.result.cancelable || []);
+        const cancelableList = rawList.filter(w => {
+          const st = String(w.status || '').toLowerCase().trim();
+          const sg = String(w.status_group || '').toLowerCase().trim();
+          return !['approved', 'done', 'cancelled', 'canceled', 'rejected', 'batal'].includes(st) && sg !== 'done' && sg !== 'rejected';
+        }).map(w => {
+          const compName = w.component_name || w.component || w.activity || w.job_description || 'Pekerjaan';
+          const unitName = w.unit_name || w.unit_code || w.unit_id || 'WORKSHOP';
+          const st = String(w.status || 'assigned').toLowerCase().trim();
+          const sl = (st === 'assigned' || st === 'pending_mechanic_work') ? 'Belum Dikerjakan'
+            : (st === 'in_progress') ? 'Sedang Dikerjakan'
+            : (st === 'pending_transfer') ? 'Menunggu Transfer'
+            : (st === 'pending_supervisor' || st === 'pending_l1') ? 'Menunggu Approval L1'
+            : (st === 'pending_superintendent' || st === 'pending_l2') ? 'Menunggu Approval L2'
+            : (w.status_label || w.status || 'Aktif');
+          let tNames = [];
+          if (Array.isArray(w.team)) {
+            tNames = w.team.map(m => m.mechanic_name || m.name || m.mechanic_id).filter(Boolean);
+          } else if (w.lead_mechanic_id) {
+            tNames = [w.lead_mechanic_name || w.lead_mechanic_id];
+          }
+          return {
+            ...w,
+            id: w.wo_number || w.id,
+            wo_number: w.wo_number || w.id,
+            status: st,
+            status_label: sl,
+            component_name: compName,
+            unit_name: unitName,
+            location: (w.location === 'field' ? 'Field' : 'Workshop'),
+            team_names: tNames,
+            created_at: w.created_at || w.date || '',
+            created_by_name: w.created_by_name || (w.created_by ? String(w.created_by).split('@')[0] : 'Creator'),
+            submitted_at: w.submitted_at || '',
+            submitted_by_name: w.submitted_by_name || (w.submitted_by ? String(w.submitted_by).split('@')[0] : ''),
+          };
+        });
+        data.data = cancelableList;
+        data.result = cancelableList;
+      } else if (cleanAksi === 'cancel_wo' && data.success) {
+        const cData = {
+          wo_id: payload.wo_id || data.wo_id || '',
+          wo_number: payload.wo_id || data.wo_id || '',
+          status: 'cancelled',
+          status_group: 'rejected',
+          status_label: 'Dibatalkan',
+          reason: payload.reason || 'Dibatalkan oleh pembuat',
+          ...(data.data || data.result || {})
+        };
+        data.data = cData;
+        data.result = cData;
+      } else if (cleanAksi === 'pull_my_wos' && data.result) {
+        const rawWos = data.result.wos || (Array.isArray(data.result) ? data.result : []);
+        const activeOnly = rawWos.filter(w => {
+          const st = String(w.status || '').toLowerCase().trim();
+          const sg = String(w.status_group || '').toLowerCase().trim();
+          return !['cancelled', 'canceled', 'rejected', 'batal'].includes(st) && sg !== 'rejected';
+        });
+        if (data.result.wos) {
+          data.result.wos = activeOnly;
+        } else if (Array.isArray(data.result)) {
+          data.result = activeOnly;
+        }
+        data.data = data.result;
       } else if (!data.data && data.result) {
         data.data = data.result;
       }

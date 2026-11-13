@@ -602,7 +602,13 @@ export async function eksekusiAksiSupabaseMandiri(action, token, parsed, env) {
     const d = await panggilRpcSupabase(`${RPC_PREFIX}_my_wos_bertoken`, { p_token: cleanToken }, env);
     if (d && d.success) {
       const rawWos = Array.isArray(d.result) ? d.result : (Array.isArray(d.result?.wos) ? d.result.wos : []);
-      const enrichedWos = rawWos.map(lengkapiWoObj).map((w) => {
+      // Filter out cancelled / rejected work orders
+      const activeRawWos = rawWos.filter(w => {
+        const st = String(w.status || '').toLowerCase().trim();
+        const sg = String(w.status_group || '').toLowerCase().trim();
+        return !['cancelled', 'canceled', 'rejected', 'batal'].includes(st) && sg !== 'rejected';
+      });
+      const enrichedWos = activeRawWos.map(lengkapiWoObj).map((w) => {
         const st = String(w.status || 'pending_mechanic_work').toLowerCase().trim();
         let sg = 'assigned';
         if (['approved', 'done', 'closed'].includes(st)) {
@@ -1099,6 +1105,11 @@ export async function eksekusiAksiSupabaseMandiri(action, token, parsed, env) {
     startWO: 'submit_work',
     finishWO: 'submit_work',
     handleSaveOverride: 'save_override',
+    saveOverride: 'save_override',
+    save_override: 'save_override',
+    overrideAndApprove: 'save_override',
+    override_and_approve: 'save_override',
+    override: 'save_override',
     handleOverrideTargetHours: 'save_override',
     handleSupervisorApprove: 'approve_l1',
     supervisorApprove: 'approve_l1',
@@ -1217,14 +1228,86 @@ export async function eksekusiAksiSupabaseMandiri(action, token, parsed, env) {
     }
   }
 
+  // Khusus save_override: hitung poin dan siapkan data override
+  if (aksiRpc === 'save_override') {
+    dataObj.wo_id = dataObj.wo_id || dataObj.id || ekstrakWoId(dataObj);
+    dataObj.is_overridden = true;
+    dataObj.has_override = true;
+    if (dataObj.target_hours_jam !== undefined || dataObj.target_hours_menit !== undefined) {
+      dataObj.target_hours = Number(dataObj.target_hours_jam || 0) + (Number(dataObj.target_hours_menit || 0) / 60);
+    }
+    if (dataObj.start_time && dataObj.end_time && !dataObj.actual_hours) {
+      const stMs = new Date(dataObj.start_time).getTime();
+      const etMs = new Date(dataObj.end_time).getTime();
+      if (!isNaN(stMs) && !isNaN(etMs) && etMs > stMs) {
+        dataObj.actual_hours = Number(((etMs - stMs) / 3600000).toFixed(2));
+        dataObj.duration_hours = dataObj.actual_hours;
+      }
+    }
+    const basePts = Number(dataObj.base_points || 1.0) || 1.0;
+    const unitF = Number(dataObj.unit_factor || 1.0) || 1.0;
+    const rawCond = String(dataObj.work_condition || 'normal').toLowerCase();
+    const condF = (rawCond === 'extreme' || rawCond.includes('ekstrim') || rawCond.includes('resiko')) ? 1.2 : ((rawCond === 'difficult' || rawCond.includes('berat') || rawCond.includes('malam') || rawCond.includes('hujan')) ? 1.1 : 1.0);
+    const calcPts = Math.round((basePts * unitF * condF) * 100) / 100;
+    dataObj.final_points = (Number(dataObj.final_points) > 0) ? Number(dataObj.final_points) : calcPts;
+    dataObj.final_idr = (Number(dataObj.final_idr) > 0) ? Number(dataObj.final_idr) : Math.round(dataObj.final_points * 2500);
+    dataObj.points = dataObj.final_points;
+    dataObj.override_reason = dataObj.override_reason || dataObj.judgment || dataObj.notes || 'Penyesuaian oleh approver';
+  }
+
   // 13. Panggil RPC Eksekusi Aksi Tulis di Supabase
-  return await panggilRpcEksekusiAksi({
+  const resRpc = await panggilRpcEksekusiAksi({
     p_token: cleanToken,
     p_aksi: aksiRpc,
     p_op_id: opId,
     p_payload: dataObj,
     p_skor_js: skorJs,
   }, env);
+
+  if (aksiRpc === 'save_override' && resRpc && resRpc.success) {
+    if (dataObj.and_approve) {
+      const targetWoId = dataObj.wo_id || resRpc.wo_id || '';
+      const pingUser = await panggilRpcSupabase(`${RPC_PREFIX}_ping`, { p_token: cleanToken }, env).catch(() => null);
+      const callerRole = String(pingUser?.result?.role || dataObj.user_role || '').toLowerCase();
+      const approveAksi = (callerRole === 'superintendent' || callerRole === 'manager') ? 'approve_l2' : 'approve_l1';
+      try {
+        await panggilRpcEksekusiAksi({
+          p_token: cleanToken,
+          p_aksi: approveAksi,
+          p_op_id: 'ov-appr-' + Date.now(),
+          p_payload: {
+            wo_id: targetWoId,
+            final_points: dataObj.final_points,
+            final_idr: dataObj.final_idr,
+            points: dataObj.final_points,
+          },
+          p_skor_js: null,
+        }, env);
+      } catch (_) {}
+    }
+    const ovResult = {
+      wo_id: dataObj.wo_id || '',
+      wo_number: dataObj.wo_id || '',
+      is_overridden: true,
+      and_approved: Boolean(dataObj.and_approve),
+      base_points: dataObj.base_points,
+      target_hours: dataObj.target_hours,
+      actual_hours: dataObj.actual_hours,
+      final_points: dataObj.final_points,
+      final_idr: dataObj.final_idr,
+      work_condition: dataObj.work_condition,
+      override_reason: dataObj.override_reason,
+      ...(resRpc.result || resRpc.data || {})
+    };
+    return {
+      success: true,
+      source: 'SUPABASE',
+      result: ovResult,
+      data: ovResult
+    };
+  }
+
+  return resRpc;
 }
 export function ekstrakWoId(body) {
   if (!body) return '';
