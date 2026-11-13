@@ -9,7 +9,7 @@ Data hanya mengalir **dari spreadsheet ke Supabase**. Alat di sini tidak pernah 
 | File | Isinya |
 |---|---|
 | `db/sum/cermin_sheet.sql` | Skema `sum`: 19 tabel cermin, plus `cermin_header`, `cermin_log`, dan `cermin_meta` |
-| `tools/sum/sinkron-cermin.mjs` | Alat sinkron: membaca sheet lewat Google Sheets API, lalu menulis ke skema `sum` |
+| `tools/cermin/sinkron.mjs` | Alat sinkron untuk semua rumah: membaca sheet lewat Google Sheets API, lalu menulis ke skema rumahnya (`--skema=sum`) |
 | `docs/INVENTARIS-SUM.md` | Daftar sheet, aksi, peran, dan rumus SUM V2 |
 
 ## Kenapa bentuknya berbeda dari cermin KMB Project
@@ -51,10 +51,12 @@ $env:GOOGLE_SA_KEY_FILE = "C:\rahasia\abadiops-cermin-sum.json"
 $env:SUM_SPREADSHEET_ID = "<ID lengkap spreadsheet SUM V2>"
 $env:DATABASE_URL       = "<koneksi Supabase, session pooler porta 5432>"
 
-node tools/sum/sinkron-cermin.mjs --kering    # 1) baca saja, tidak menulis apa pun
-node tools/sum/sinkron-cermin.mjs             # 2) tulis ke skema sum
-node tools/sum/sinkron-cermin.mjs --sheet=WorkOrders   # satu sheet saja
+node tools/cermin/sinkron.mjs --skema=sum --kering    # 1) baca saja, tidak menulis apa pun
+node tools/cermin/sinkron.mjs --skema=sum             # 2) tulis ke skema sum
+node tools/cermin/sinkron.mjs --skema=sum --sheet=WorkOrders   # satu sheet saja
 ```
+
+Bawaannya sheet `AuditLogs` tidak disalin (keputusan Gabriel 13 Nov, demi ukuran Gedung 1). Tambahkan `--lewati=` untuk menyalin semua sheet.
 
 **Selalu jalankan dengan `--kering` lebih dulu.** Mode ini membaca semua sheet dan mencetak jumlah baris, jumlah kolom, sidik (sha256), dan kolom bertipe campur, tanpa menulis apa pun ke database.
 

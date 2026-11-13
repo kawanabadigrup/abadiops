@@ -1,0 +1,24 @@
+# Penjaga Gedung: mengetuk Supabase Gedung 1 dan Gedung 2 tiap 6 jam supaya proyek
+# paket Free tidak dijeda karena menganggur (dijeda setelah 7 hari tanpa aktivitas).
+# Penjelasan: src/index.js. Hanya satu lingkungan; Worker ini menjaga produksi dan staging sekaligus.
+name = "abadiops-penjaga"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Akun Cloudflare kawanabadigrup. Dikunci supaya deploy tidak pernah nyasar ke akun lain.
+account_id = "9273ece6d47a3bb103159295c10ce9e6"
+
+# Menit 17, bukan 0, supaya tidak berbarengan dengan cron lain di pergantian jam (UTC).
+[triggers]
+crons = ["17 */6 * * *"]
+
+# Alamat dan kunci publishable sama dengan [vars] Worker rumah (workers/sum/wrangler.toml).
+[vars]
+GEDUNG = [
+  { nama = "Gedung 1 (produksi)", url = "https://sptgqsjgszwbreikxdph.supabase.co", kunci = "sb_publishable_PoWC64yv25bZizBrTL79vw_CuNQwhp3" },
+  { nama = "Gedung 2 (staging)", url = "https://dnnqrslftndcbmnvuveb.supabase.co", kunci = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O" },
+]
+
+[observability]
+enabled = true

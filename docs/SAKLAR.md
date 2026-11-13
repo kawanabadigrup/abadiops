@@ -24,12 +24,12 @@ Urutannya selalu `gas`, lalu `dua_cabang`, lalu `supabase`. Posisi `supabase` ba
 
 Data mengalir dari spreadsheet ke Supabase sebagai cermin, tidak pernah sebaliknya.
 - Setiap kali aksi yang diteruskan ke GAS berhasil, Worker langsung menarik WO yang berubah ke cermin.
-- Selain itu ada sinkron penuh berkala, ditambah laporan selisih harian.
+- Selain itu ada sinkron penuh berkala, ditambah laporan selisih harian. Keduanya jalan di workflow `cermin` (`.github/workflows/cermin.yml`): sinkron tiap jam, dan pemeriksaan selisih penuh sekali sehari mulai 02.00 WIB. Hasilnya di `<skema>.cermin_meta` (`periksa_hasil`, `hari_tanpa_selisih`) dan `<skema>.cermin_log`.
 - Halaman web GAS yang dipakai supervisor di laptop menulis langsung ke spreadsheet tanpa lewat Worker. Karena itu sinkron berkala wajib, dan halaman web GAS rumah itu harus ditutup atau dibuat hanya-baca sebelum saklarnya dinyalakan.
 
 ## Syarat sebelum saklar sebuah rumah dinyalakan
 
-- [ ] Cermin rumah itu tidak punya selisih dengan spreadsheet selama **7 hari** berturut-turut.
+- [ ] Cermin rumah itu tidak punya selisih dengan spreadsheet selama **7 hari** berturut-turut (`hari_tanpa_selisih` minimal 7 di `<skema>.cermin_meta`).
 - [ ] Semua aksi tulis dan halaman web rumah itu sudah dipindah dan **lulus uji rekam-putar** di staging: hasil Worker sama dengan hasil GAS, kolom per kolom.
 - [ ] **Buku tamu kiriman** sudah aktif di pintu depan dan disimpan di Cloudflare, bukan di Supabase. Dengan begitu, kiriman yang dikirim ulang tidak tercatat dua kali, ke mesin mana pun.
 - [ ] Cermin ikut menyalin `ProcessedOps` dari GAS.

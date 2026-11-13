@@ -2,7 +2,7 @@
 
 > **Sejak 30 Okt malam:** Raka tidak lagi memegang kode (`docs/KEPUTUSAN.md`, baris 30 Okt). Rencana §5 dikerjakan Gabriel (+ Claude). Dokumen ini tetap menjadi rencana dan catatan status.
 >
-> **Sejak 2 Nov:** Raka boleh mengubah kode dan deploy **hanya di staging**: branch `staging`, `--env staging`, Gedung 2 (`AGENTS.md` butir 16). Produksi tetap dipegang Gabriel (+ Claude).
+> **Sejak 13 Nov:** kerja Raka diserahkan ke Gabriel (+ Claude), dan izin staging 2 Nov dicabut. Arsipnya ada di branch `staging` dan tag `raka-akhir-2026-11-11` (`docs/KEPUTUSAN.md`, baris 13 Nov).
 
 Untuk Raka dan AI-nya. Baca dari atas sampai bawah sebelum mulai. Rinciannya ada di `docs/PROGRES.md` (entri 28–29 Okt), `docs/KEPUTUSAN.md`, `docs/SAKLAR.md`, dan `docs/BUG-DICATAT.md` (#11–#18).
 

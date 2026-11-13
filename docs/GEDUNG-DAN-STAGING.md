@@ -36,6 +36,11 @@ Berlaku untuk semua orang dan semua AI di repo ini. Ditulis 30 Okt 2026 atas per
    - Worker produksi tidak pernah memakai kunci staging, dan sebaliknya.
 4. **Gedung ketiga berarti pembayaran**, jadi itu titik henti: tanya Gabriel dulu. Sebagai gambaran, paket Pro sekitar $25/bulan dan setiap project tambahan sekitar +$10/bulan. Alasan yang sah untuk Pro adalah ukuran database atau cadangan, **bukan** jumlah rumah (`docs/KEPUTUSAN.md`, baris "Biaya").
 5. **Awasi ukuran database.** Paket gratis memberi 500 MB per gedung, dan jatah itu dipakai bersama oleh semua rumah. Kalau mendekati 400 MB, lapor ke Gabriel (keputusan Biaya 29 Okt).
+6. **Gedung tidak boleh menganggur 7 hari.** Paket gratis menjeda gedung yang 7 hari tanpa aktivitas. Gedung 1 sempat dijeda karena itu (ketahuan 13 Nov 2026), sebab selama saklar `gas` tidak ada yang memanggilnya.
+   - Worker `abadiops-penjaga` (`workers/penjaga/`) mengetuk kedua gedung tiap 6 jam. Untuk cek manual: `https://abadiops-penjaga.kawanabadigrup.workers.dev/cek`.
+   - Penjaga satu-satunya Worker yang memegang alamat kedua gedung sekaligus. Ia hanya memanggil `sum_ping` dengan token palsu, jadi aturan 3 tidak dilanggar.
+   - Gedung baru: tambahkan ke `GEDUNG` di `workers/penjaga/wrangler.toml`.
+   - Penjaga tidak bisa membangunkan gedung yang sudah dijeda. Gedung seperti itu dipulihkan dari dasbor Supabase (Restore project).
 
 **Selesai ditangani (30 Okt 2026):** Project `dnnqrslftndcbmnvuveb` telah resmi dialihfungsikan menjadi **Gedung 2 (Staging)** lengkap dengan 3 skema (`sum`, `kmb`, `kmb_projek`) dan Worker GAS Tiruan (`workers/gas-tiruan/`). Skema SUM produksi telah disatukan di Gedung 1 bersama `kmb` dan `kmb_projek`. Jatah 2 gedung gratis tetap terjaga (0 rupiah).
 

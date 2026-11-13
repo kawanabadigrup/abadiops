@@ -9,7 +9,7 @@ Data hanya mengalir **dari spreadsheet ke Supabase**. Alat di sini tidak pernah 
 | File | Isinya |
 |---|---|
 | `db/kmb/cermin_sheet.sql` | Skema `kmb`: tabel cermin mentah, plus `cermin_header`, `cermin_log`, dan `cermin_meta` |
-| `tools/kmb/sinkron-cermin.mjs` | Alat sinkron: membaca sheet lewat Google Sheets API, lalu menulis ke skema `kmb` |
+| `tools/cermin/sinkron.mjs` | Alat sinkron untuk semua rumah: membaca sheet lewat Google Sheets API, lalu menulis ke skema rumahnya (`--skema=kmb`) |
 
 ## Format Cermin Mentah (JSONB)
 
@@ -27,7 +27,9 @@ $env:GOOGLE_SA_KEY_FILE = "C:\rahasia\abadiops-cermin.json"
 $env:KMB_SPREADSHEET_ID = "1ehnxDlv..."
 $env:DATABASE_URL       = "<koneksi Supabase, session pooler porta 5432>"
 
-node tools/kmb/sinkron-cermin.mjs --kering    # 1) uji kering baca tanpa tulis
-node tools/kmb/sinkron-cermin.mjs             # 2) tulis ke skema kmb
-node tools/kmb/sinkron-cermin.mjs --sheet=WorkOrders   # satu sheet saja
+node tools/cermin/sinkron.mjs --skema=kmb --kering    # 1) uji kering baca tanpa tulis
+node tools/cermin/sinkron.mjs --skema=kmb             # 2) tulis ke skema kmb
+node tools/cermin/sinkron.mjs --skema=kmb --sheet=WorkOrders   # satu sheet saja
 ```
+
+Daftar sheet dibaca langsung dari spreadsheet, jadi tabel untuk sheet baru dibuat sendiri oleh alat. Bawaannya sheet `AuditLogs` tidak disalin (keputusan Gabriel 13 Nov). Tambahkan `--lewati=` untuk menyalin semua sheet.

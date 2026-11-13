@@ -7,9 +7,7 @@ Dokumen ini adalah panduan praktis bagi **Gabriel** dan **Raka** untuk menyiapka
 ## 1. Mengapa File Ini Dibutuhkan?
 
 Untuk menyalin ribuan baris data dari spreadsheet ke tabel cermin Supabase skema `sum`, `kmb`, dan `kmb_projek`, kita menggunakan skrip sinkronisasi otomatis:
-- `tools/sum/sinkron-cermin.mjs`
-- `tools/kmb/sinkron-cermin.mjs`
-- `tools/kmb_projek/sinkron-cermin.mjs`
+- `tools/cermin/sinkron.mjs`, satu alat untuk semua rumah (`--skema=sum`, `--skema=kmb`, `--skema=kmb_projek`, `--skema=kmbbupr`)
 
 Skrip ini membaca spreadsheet langsung lewat **Google Sheets API v4 resmi** (berkecepatan tinggi tanpa batas waktu 6 menit GAS). Agar skrip ini diizinkan membaca isi sheet, Google mewajibkan sebuah **akun layanan robot (Service Account)** dengan izin baca-saja (*Viewer*).
 
@@ -63,12 +61,12 @@ Setelah file JSON tersimpan di laptop (misal di `D:\sa-key.json`) dan email suda
 Buka terminal PowerShell di folder repo:
 ```powershell
 $env:GOOGLE_SA_KEY_FILE = "D:\sa-key.json"
-node tools/sum/sinkron-cermin.mjs --kering
+node tools/cermin/sinkron.mjs --skema=sum --kering
 ```
 
 ### Eksekusi Sinkronisasi Penuh ke Supabase
 ```powershell
 $env:GOOGLE_SA_KEY_FILE = "D:\sa-key.json"
-node tools/sum/sinkron-cermin.mjs
+node tools/cermin/sinkron.mjs --skema=sum
 ```
-Skrip akan otomatis menyedot seluruh sheet ke 22 tabel cermin mentah skema `sum` di Supabase.
+Alat menyalin setiap sheet ke tabel cermin mentah skema `sum` di Supabase, kecuali `AuditLogs` (keputusan Gabriel 13 Nov).

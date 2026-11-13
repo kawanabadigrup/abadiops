@@ -12,6 +12,214 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (laporan selisih harian cermin)
+- Berubah:
+  - **`tools/cermin/sinkron.mjs --periksa`:**
+    - setiap sheet dimuat ulang ke tabel sementara walaupun tidak berubah, lalu seluruh isi tabel cermin dibandingkan dengan isi sheet **di dalam database**: `nilai` dan `data` per baris, termasuk baris yang hilang atau berlebih. Yang keluar dari database hanya angka selisih, jadi tidak memakan jatah egress;
+    - selisih yang tersisa sesudah ditulis membuat sheet itu GAGAL. Workflow jadi merah dan GitHub mengirim surel;
+    - hasilnya dicatat di `cermin_log.selisih` dan `cermin_meta` (`periksa_terakhir`, `periksa_hasil`, `hari_tanpa_selisih`);
+    - `hari_tanpa_selisih` menghitung hari WIB berturut-turut sampai hari ini yang punya pemeriksaan, tanpa selisih, dan tanpa sinkron gagal.
+  - **`--periksa=harian`:** sekali per hari kalender WIB per rumah, mulai pukul 02.00 WIB. Workflow `cermin` tiap jam memakainya. Kalau dijalankan manual, ada pilihan "periksa" untuk memeriksa sekarang juga.
+  - **Uji:**
+    - kueri selisih menangkap baris yang berubah, hilang, dan berlebih (0, lalu 2, lalu 3, di dalam transaksi yang dibatalkan);
+    - pemeriksaan BUPR: 23 dari 23 sheet sama;
+    - pemeriksaan penuh pertama dari GitHub (dijalankan manual 14 Nov 00:00 WIB, ±14 menit): **87 dari 87 sheet sama** di keempat rumah, workflow hijau.
+  - `docs/SAKLAR.md`: tempat melihat laporan, dan ukuran syarat 7 hari.
+- Belum selesai / berikutnya:
+  - Syarat "7 hari tanpa selisih" paling cepat terpenuhi 20 Nov (14–20 Nov), kalau setiap hari bersih.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin per baris; jadwal tiap jam di GitHub Actions)
+- Berubah:
+  - **Sinkron per baris** (`tools/cermin/sinkron.mjs`):
+    - sheet yang sidiknya sama dengan sinkron sebelumnya, dan jumlah barisnya cocok, tidak ditulis ulang;
+    - sheet yang berubah dimuat dulu ke tabel sementara. Hanya baris baru atau berubah yang ditulis (perbandingan nilai `jsonb`), dan baris yang hilang dihapus;
+    - `cermin_log` mendapat kolom `baris_berubah` dan `baris_dihapus`. Catatan yang lebih tua dari 35 hari dihapus;
+    - opsi baru `--semua` (semua `<SKEMA>_SPREADSHEET_ID` di lingkungan) dan `--ringkas` (satu baris per rumah, tanpa judul, ID, atau isi data);
+    - uji di Gedung 1: 23 sheet BUPR tidak berubah, dan dari SUM hanya 4 sheet yang berubah (7 baris ditulis). Ukuran tetap 245 MB;
+    - sidik setiap sheet dihitung ulang dari isi Gedung 1: 87 dari 87 sheet identik dengan spreadsheet saat sinkron terakhir.
+  - **Jadwal tiap jam** (`.github/workflows/cermin.yml`, menit ke-41):
+    - koneksi lewat pooler IPv4 (`aws-0-ap-southeast-1`), karena runner GitHub tidak punya IPv6;
+    - rahasia Actions `GOOGLE_SA_KEY_JSON`, `CERMIN_DATABASE_URL`, dan `CERMIN_RUMAH` diisi dari `abadiops.env` lewat API GitHub. Tokennya fine-grained `abadiops-cermin`: hanya repo abadiops, izin Actions dan Secrets, berlaku sampai 11 Feb 2027;
+    - rumah baru cukup ditambah satu baris di `CERMIN_RUMAH`, tanpa mengubah kode;
+    - log dibuat ringkas karena repo publik, dan ID spreadsheet disamarkan.
+  - **Putaran pertama di GitHub** (dijalankan manual, selesai 13 Nov ±23:51 WIB) lulus dalam ±10 menit: 87 sheet lulus, 0 gagal, dan hanya 24 baris KMB TRA yang ditulis. `sinkron_terakhir` keempat skema di Gedung 1 ikut diperbarui; ukuran tetap 245 MB.
+- Belum selesai / berikutnya:
+  - Hitungan "7 hari tanpa selisih" dimulai dari putaran terjadwal pertama yang lulus.
+  - Pemeriksaan selisih harian perlu dibuat tanpa menarik seluruh isi tabel, karena batas egress paket gratis 5 GB per bulan. Caranya: simpan sidik yang bisa dihitung di sisi database.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (cermin keempat rumah tertulis di Gedung 1)
+- Berubah:
+  - **Keputusan Gabriel** (`docs/KEPUTUSAN.md`):
+    - cermin tanpa `AuditLogs` dulu; naik ke Supabase Pro nanti, kalau kode sudah berfungsi atau data sudah berat;
+    - skema lama `kmb_projek` di Gedung 1 diganti format cermin.
+  - **Alat cermin tunggal `tools/cermin/sinkron.mjs`** menggantikan ketiga alat per rumah (bug #29):
+    - daftar sheet dibaca langsung dari spreadsheet. Nama tabel adalah nama sheet dalam snake_case, dan tabel yang belum ada dibuat sendiri dengan bentuk cermin mentah;
+    - rumah dipilih dengan `--skema=<skema>`, dan ID spreadsheet diambil dari `<SKEMA>_SPREADSHEET_ID`. Rumah baru cukup satu baris env, tanpa mengubah kode;
+    - `AuditLogs` dilewati secara bawaan (`--lewati=` untuk menyalin semua);
+    - tabel yang sudah ada tapi bentuknya lain tidak disentuh;
+    - tahan kuota 429, galat 5xx, dan jaringan putus sesaat. `sinkron_terakhir` hanya dicatat kalau satu putaran penuh lulus;
+    - uji kering: hasil bacanya sama dengan alat lama. Setiap sheet yang tidak berubah punya sidik identik.
+  - **Sebelum menulis**, dari kode Worker yang tayang dipastikan:
+    - Worker SUM dan KMB TRA produksi hanya membaca Supabase lewat `?uji=supabase` (`AKSI_SUPABASE_LULUS_KEMBAR` kosong);
+    - Worker KMB Project tidak memakai Supabase;
+    - jadi mengisi cermin tidak mengubah apa yang dilihat pengguna.
+  - **Gedung 1:**
+    - skema lama `kmb_projek` (11 tabel, salinan 27 Okt) dipindah utuh ke `kmb_projek_lama`, tertutup untuk anon. Skema `kmb_projek` dibuat ulang untuk cermin;
+    - cermin keempat rumah tertulis, dan jumlah baris setiap tabel cocok dengan `cermin_header`:
+      - `sum`: 18 sheet, 138.547 baris, 109 MB;
+      - `kmb`: 23 sheet, 157.575 baris, 98 MB;
+      - `kmb_projek`: 23 sheet, 23.231 baris, 16 MB;
+      - `kmbbupr` (skema baru): 23 sheet, 12.881 baris, 8 MB;
+    - ukuran Gedung 1 245 MB (49% dari 500 MB). Semua skema cermin tertutup untuk anon;
+    - percobaan pertama terputus karena jaringan di komputer kerja. 13 sheet SUM sempat tertulis dua kali; ruang ±15 MB yang tersisa akan terpakai ulang.
+  - 9 fungsi lama `public.kmb_*` (portal lama, tidak dipakai kode produksi) masih merujuk tabel bentuk lama di `kmb_projek`. Sekarang fungsi itu akan galat kalau dipanggil.
+- Belum selesai / berikutnya:
+  - **Sinkron terjadwal.** Cermin baru disalin sekali. Hitungan "7 hari tanpa selisih" baru mulai setelah sinkron berjalan rutin. Perlu tempat menjalankannya. Usulan: GitHub Actions, lewat pooler IPv4, karena runner GitHub tidak punya IPv6.
+  - **Sinkron per baris.** Sekarang alat menghapus lalu menulis ulang setiap tabel, sehingga tabel bisa membengkak sampai ±2× isinya. Sebelum dijadwalkan sering, ubah menjadi pembaruan per baris.
+  - Fungsi `public.kmb_*` lama: tulis ulang untuk format cermin saat aksi baca KMB Project dipindah, atau cabut aksesnya dari anon.
+  - `kmb_projek_lama` boleh dihapus setelah cermin baru terbukti.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (rahasia lokal lengkap; uji kering cermin empat spreadsheet)
+- Berubah:
+  - **Rahasia lokal lengkap** (`abadiops.env`, di luar repo):
+    - kunci akun layanan Google yang baru;
+    - ID spreadsheet keempat rumah dengan pola `<KODE>_SPREADSHEET_ID`, termasuk baris baru `KMBBUPR_SPREADSHEET_ID`;
+    - token uji KMB Project.
+  - Akun layanan bisa membaca keempat spreadsheet: SUM V2, KMB V2, Projek KMB, dan New MAR Project (BUPR). Masing-masing dibagikan sebagai Viewer dari akun Google pemiliknya.
+  - **Kuota Sheets API (bug #28):** ketiga alat sinkron sekarang memberi jeda 1,1 detik antarpermintaan, dan mencoba ulang kalau kena 429 atau 5xx. Sebelumnya, putaran pertama SUM berhenti di sheet ke-14, lalu semua sheet sesudahnya ikut gagal.
+  - **Uji kering** (`--kering`, tanpa koneksi database). Tidak ada satu pun 429:
+    - SUM V2: 19 dari 19 sheet cocok. WorkOrders 380, WorkOrders_Archive 16.702, MechanicPoints 36.075, AuditLogs 72.551.
+    - KMB V2: 16 dari 24 sheet tersalin. WorkOrders 813, WorkOrders_Archive 14.088, MechanicPoints 42.341, AuditLogs 73.893.
+    - Projek KMB: 12 dari 24 sheet tersalin. WorkOrders 129, WorkOrders_Archive 1.121.
+    - New MAR Project (BUPR), diuji dengan alat kmb_projek: 12 dari 24 sheet tersalin. WorkOrders 3, WorkOrders_Archive 11.
+  - **Temuan:** alat cermin keluarga KMB tidak cocok dengan spreadsheet aslinya (bug #29 baru). Ketiga spreadsheet keluarga KMB punya 24 sheet yang sama.
+  - **Perkiraan ukuran** (dari Gedung 2 dan jumlah baris hari ini):
+    - cermin penuh keempat rumah ±400 MB, sedangkan batas Gedung 1 di paket gratis 500 MB;
+    - AuditLogs saja ±120 MB;
+    - data SUM bertambah ±10% dalam dua minggu terakhir.
+- Belum selesai / berikutnya:
+  - Sebelum menulis ke Gedung 1, Gabriel perlu memutuskan:
+    - ukuran: AuditLogs ikut dicermin atau tidak, atau naik ke paket Pro;
+    - tabel lama `kmb_projek` di Gedung 1 (salinan 27 Okt yang tidak dipakai kode produksi) diganti format cermin.
+  - Perbaiki alat cermin KMB (bug #29), lalu uji kering lagi.
+  - Sinkron terjadwal belum ada. Hitungan syarat "cermin 7 hari" baru mulai setelah sinkron terjadwal berjalan.
+  - Drive API di proyek Google akun layanan belum aktif, karena konsol Google Cloud mewajibkan Verifikasi 2 Langkah sejak 29 Mei 2026. Selama belum aktif, ID spreadsheet rumah baru diambil dari URL yang dikirim Gabriel.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (Gedung 2: isi diperiksa, celah admin ditutup)
+- Berubah:
+  - `DATABASE_URL_GEDUNG2` terisi, setelah sandi database Gedung 2 di-reset. Nama proyek Supabase-nya "Stagging".
+  - **Isi Gedung 2** (dibaca 13 Nov):
+    - Ukurannya 342 MB dari batas 500 MB. Ini sumber angka 374 MB di halaman organisasi.
+    - Isinya cermin produksi yang lengkap: `sum` 202 MB dan `kmb` 126 MB. Tabel terbesar `audit_logs` (±50 MB per rumah) dan `work_orders_archive`.
+    - Token terakhir disinkron 10 Nov: `sum.api_tokens` 63 baris, `kmb.api_tokens` 46 baris.
+    - Cermin produksi ada di staging, tapi tidak di Gedung 1. Data ini salinan asli, jadi dijaga serahasia produksi.
+  - **Celah admin ditutup:** `EXECUTE` pada 30 fungsi `*_admin_*_bertoken` dicabut dari `PUBLIC`, `anon`, dan `authenticated`. Data dan isi fungsi tidak diubah. Uji dari luar dengan kata ajaib sekarang dijawab 401.
+  - **Jejak pemakaian** (tanpa data pemanggil):
+    - `pg_stat_statements` mencatat sekitar 215 panggilan `*_admin_daftar_user_bertoken`, plus beberapa simpan/set-status;
+    - `kmb_projek.processed_ops` mencatat 5 aksi admin, 9–11 Nov;
+    - log API Supabase paket gratis hanya menyimpan 1 hari, jadi pemanggil dari luar tidak bisa dipastikan.
+  - Keputusan Gabriel: kerja Raka **dilanjutkan** di branch `staging` dan Gedung 2 (`docs/KEPUTUSAN.md`; `AGENTS.md` butir 16 disesuaikan).
+- Belum selesai / berikutnya:
+  - Panel admin pengguna dan config di `/saklar` staging berhenti sampai otorisasinya diganti, dari kata ajaib menjadi sesi panel yang diperiksa di Worker dengan kunci rahasia.
+  - Lanjutkan daftar wajib-perbaiki di entri serah-terima 13 Nov, mulai dari keamanan.
+  - Ukuran Gedung 2 perlu diawasi (68% dari batas). Kandidat pengecilan: `audit_logs` cermin.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (penjaga gedung: Supabase tidak dijeda lagi)
+- Berubah:
+  - Gedung 1 (`sptgqsjgszwbreikxdph`) NXDOMAIN sejak sebelum 13 Nov. Kemungkinan dijeda Supabase karena 7 hari tanpa aktivitas, sebab selama saklar `gas` tidak ada yang memanggilnya dan `pantau.yml` terjadwal dimatikan 29 Okt.
+  - Worker baru `abadiops-penjaga` (`workers/penjaga/`), cron `17 */6 * * *`:
+    - mengetuk Gedung 1 dan Gedung 2 lewat `sum_ping` dengan token palsu (hanya baca);
+    - ketukan yang gagal tercatat sebagai error di log Worker;
+    - `GET /cek` mengetuk saat itu juga.
+  - Aturan 6 di `docs/GEDUNG-DAN-STAGING.md` §1.
+  - Diuji 13 Nov: `/cek` menjawab Gedung 2 200, dan Gedung 1 530 (masih dijeda). Cron terdaftar di akun (satu-satunya cron).
+- Belum selesai / berikutnya:
+  - ~~Gabriel memulihkan Gedung 1 dari dasbor Supabase.~~ **Dipulihkan 13 Nov sore** (Resume project). `/cek` menjawab 200 untuk kedua gedung.
+  - Gedung 1 diperiksa langsung lewat database (13 Nov, hanya baca):
+    - **Cermin SUM dan KMB TRA kosong.** Semua tabel skema `sum` (22 tabel) dan `kmb` (24 tabel) berisi 0 baris, termasuk `cermin_meta` dan `cermin_log`, jadi keduanya belum pernah disinkron ke Gedung 1.
+    - **Cermin KMB Project sudah lama.** Isinya baru sekali dimuat, 27 Okt (16 WO, 51 arsip, 20 token, 1.533 katalog job).
+    - **Ukuran database Gedung 1 hanya 15 MB.** Angka 374/500 MB di halaman organisasi bukan dari Gedung 1.
+    - **Fungsi admin dan eksekusi Raka tidak ada** di Gedung 1.
+  - Berikutnya, sinkron cermin ketiga rumah ke Gedung 1 (`tools/<rumah>/sinkron-cermin.mjs`, mulai dengan `--kering`). Untuk itu dibutuhkan kunci JSON akun layanan dan ID spreadsheet SUM serta KMB TRA.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (deploy pintu produksi: #24 dan #26 tayang)
+- Berubah:
+  - Token Cloudflare `abadiops-deploy` dipasang di `C:\dev\rahasia\abadiops.env`. Izinnya Workers di akun kawanabadigrup, serta Workers Routes/DNS edit dan Zone read di abadiops.com. Berlaku sampai 11 Feb 2027.
+  - Riwayat deploy Cloudflare:
+    - Worker produksi terakhir di-deploy 30 Okt. Sejak 2 Nov tidak ada deploy produksi.
+    - Pintu staging terakhir di-deploy 12 Nov 13:51 WIB.
+  - Pintu produksi di-deploy dari `main` sebagai versi `6ac7fea8`; versi untuk kembali: `934f12d9`.
+    - Kodenya beda dari yang tayang hanya di #26.
+    - Ikut tayang `a4107da` (login panel menerima `success`).
+  - Diuji di produksi:
+    - tiga token uji masuk lewat pintu, dan tombol Web membuka web GAS (#24 beres di produksi);
+    - `/saklar/api/status` tanpa sesi dijawab 401;
+    - saklar produksi semua `gas`.
+  - Akses akun Raka tetap, atas keputusan Gabriel.
+- Belum selesai / berikutnya: lihat entri serah-terima di bawah.
+
+---
+
+### 2026-11-13 · Gabriel (+ Claude) · bersama (serah-terima kerja Raka; audit staging 2–11 Nov)
+- Berubah:
+  - Kerja Raka disimpan di repo ini:
+    - branch `staging` dimajukan ke `3e55ca8`, termasuk 21 commit yang sebelumnya hanya ada di fork `hrmarsa17/MAR-PROJECT`;
+    - tag `raka-akhir-2026-11-11`.
+  - Keputusan dicatat di `docs/KEPUTUSAN.md` (13 Nov), dan butir 16 `AGENTS.md` diganti.
+  - Isi staging: 80 commit sejak `main`, 89 berkas, +145.889 baris. Dari situ, 16 berkas `docs/panduan_deploy_staging_kamis*.md` (117.499 baris) adalah keluaran chat AI, bukan kode.
+  - **Produksi tidak tersentuh** (dicek 13 Nov):
+    - `main` tetap `3382c32`, dan saklar produksi semua `gas`.
+    - Pintu produksi tidak punya rute baru Raka (404).
+    - Login pintu dengan tiga token uji berhasil.
+    - Fungsi SQL Raka tidak ada di Gedung 1 (dicek 6 Nov).
+  - **Yang sudah tayang di staging** (`*-staging.kawanabadigrup.workers.dev`, saklar staging semua `supabase`):
+    - backend Supabase untuk aksi WO ketiga rumah;
+    - panel pengguna dan config di `/saklar`;
+    - ekspor payroll Excel;
+    - buku tamu kiriman;
+    - perbaikan halaman web (approvals, monitoring, form WO).
+  - **Belum layak produksi.** Yang wajib diperbaiki sebelum dipindah ke `main`:
+    1. **WO baru hilang saat sinkron.** WO baru SUM dan KMB TRA ditulis ke tabel cermin (`sum.work_orders`, `kmb.work_orders`), padahal sinkron cermin menghapus isi tabel itu.
+    2. **Saklar bisa dilewati.** Klien bisa memilih jalur Supabase lewat `?uji=supabase`, header `X-Active-Engine`, atau `engine` di body.
+    3. **Uang belum 1:1 GAS.** Tarif dan faktor tertulis mati di `src/domain/scoring.mjs` dan `payroll-excel.js` (helper 1.500, junior 2.500, senior 3.000, dipilih dari kata di jabatan). GAS membaca `Config_Factors` dan `Config_Settings` (`rate_<posisi>`; SUM: `idr_rate` × pengali golongan). Butuh keputusan Gabriel.
+    4. **Panel menampilkan data rekaan.** Bila RPC gagal, `/saklar` menampilkan unit dan pengguna rekaan dan "menyimpan" ke memori Worker.
+    5. **Buku tamu kiriman belum aman.**
+       - Rute `/api/buku-tamu/*` di pintu tanpa otorisasi.
+       - Rumah memercayai hasil tersimpan tanpa memeriksa token atau rumah.
+       - `tentukanUrlPintu` selalu memilih pintu staging (`|| true`), jadi rumah produksi tanpa binding akan menulis ke staging.
+       - Isinya disimpan di SaklarDO tanpa batas umur.
+    6. **Monitoring SUM membocorkan token.** Token semua mekanik ikut dikirim tanpa cek peran, padahal GAS membatasinya untuk L1/L2.
+    7. **Celah otorisasi di fungsi admin SQL staging (Gedung 2).** Fungsi `_validasi_admin_token` menerima teks tetap `__PANEL_SAKLAR_PUSAT__` sebagai admin, dan fungsi `*_admin_*_bertoken` dibuka untuk `anon`. **Ditutup 13 Nov** (lihat entri Gedung 2 di atas). Kata ajaib itu masih harus dibuang dari kode.
+    8. **Saklar dan asal WO belum benar.** Saklar KMB TRA dibaca dengan kunci `kmb`, padahal panel memakai `kmbtra` (#27 belum beres untuk KMB TRA). Asal WO ditebak dari jumlah digit, bukan dari awalan seperti di `docs/SAKLAR.md`.
+    9. **Uji belum membuktikan fungsi.** Uji Raka (40/40, 27/27, 24/24) sebagian besar hanya mencari teks di berkas. CI tidak jalan di `staging`, dan tidak ada PR.
+    10. **Konfigurasi produksi ikut diubah.** Di `wrangler.toml`, pintu produksi diberi Gedung 1 dan KMB Project produksi diberi binding pintu.
+  - **Temuan lain 13 Nov** (bukan kerja Raka):
+    - **Gedung 1 tidak ditemukan.** `sptgqsjgszwbreikxdph` NXDOMAIN, juga lewat DNS Google. Kemungkinan dijeda Supabase karena lama tidak dipakai (`pantau.yml` terjadwal dimatikan 29 Okt). Produksi tidak terdampak, karena saklar `gas`.
+    - **#24 masih tayang.** Tombol Web di pintu produksi membuka `<rumah>.abadiops.com/web`, yang tampil kosong. Perbaikannya (`ba2732d`) belum di-deploy karena token Cloudflare belum ada.
+    - **PWA produksi KMB Project diubah Raka.** Pada 2 Nov, `gabrielrurent/PWA-Project-KMB` diubah ke projek-v14 (menu WO tetap tampil saat kosong). Perubahan ini belum ada di `pwa/kmbprojek`.
+- Belum selesai / berikutnya:
+  - Gabriel:
+    - tutup celah Gedung 2 dengan SQL dari Claude;
+    - pulihkan Gedung 1 di dasbor Supabase;
+    - isi `C:\dev\rahasia\abadiops.env`.
+  - Claude:
+    - deploy pintu (`ba2732d`) begitu token ada;
+    - lalu pindahkan bagian staging yang benar ke `main` satu per satu, mengikuti daftar di atas.
+
+---
+
 ### 2026-11-11 · Raka (+ AI) · sum (Perbaikan 1:1 Distribusi Final Points, Rupiah, & Team Share Kartu WO Approved)
 - Berubah:
   - **WO Approval -> Tab Approved (SUM V2)**:
@@ -133,7 +341,7 @@ Formatnya:
 
 ---
 
-### 2026-11-11 · Raka (+ AI) · sum (Perbaikan Bug #29: Stale Cache / Angka 0 di Mechanic Dashboard SUM)
+### 2026-11-11 · Raka (+ AI) · sum (Perbaikan Bug #30, semula #29 di branch staging: Stale Cache / Angka 0 di Mechanic Dashboard SUM)
 - Berubah:
   - **Akar Masalah Angka 0 & Kartu Kosong di Tab Assigned / Pending SUM**:
     - Service Worker SUM (`pwa/sum/sw.js`) sebelumnya tidak memiliki pengecekan `if (url.search) return;` seperti halnya di `pwa/kmb` dan `pwa/kmbprojek`.
@@ -2078,6 +2286,7 @@ Formatnya:
   - Gabriel mengeksekusi `db/kmb_projek/migrasi_kamis_full_penuh.sql` di Supabase SQL Editor Staging (`dnnqrslftndcbmnvuveb`) bila belum dijalankan.
   - Sesuai AGENTS.md §16, seluruh pekerjaan tetap berada di branch `staging`, tidak men-deploy produksi, dan tidak push ke `main`.
 
+---
 
 ### 2026-10-30 · Gabriel (+ Claude) · bersama (audit kerja Raka 30 Okt di semua sistem)
 - Berubah:

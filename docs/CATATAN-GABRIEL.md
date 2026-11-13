@@ -192,5 +192,5 @@ Panduan langkah demi langkah (±2 menit) sudah disiapkan di [docs/PANDUAN-SERVIC
 4. Jalankan pengujian sinkronisasi kering (dry-run):
    ```powershell
    $env:GOOGLE_SA_KEY_FILE = "D:\sa-key.json"
-   node tools/sum/sinkron-cermin.mjs --kering
+   node tools/cermin/sinkron.mjs --skema=sum --kering
    ```

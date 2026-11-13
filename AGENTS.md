@@ -94,12 +94,14 @@ Cara kerja yang terbukti 28–29 Okt 2026. Ikuti seperti aturan, bukan saran.
     - Salinan 1:1: dicek byte demi byte dengan sumber yang benar (`clasp clone` rumah itu sendiri).
     - Jangan mengarahkan pengguna produksi ke fitur baru sebelum bukti itu ada.
     - Pelajaran 30 Okt: bug #24–#27.
-16. **Raka dan AI-nya hanya bekerja di staging** (keputusan Gabriel, 2 Nov).
-    - Kerjakan di branch `staging`, bukan `main`. Yang menggabungkan ke `main` dan men-deploy produksi hanya Gabriel (+ Claude), setelah perubahan lulus uji ulang.
-    - Deploy hanya dengan `npx wrangler deploy --env staging`. Perintah `npx wrangler deploy` **tanpa** `--env staging` adalah deploy produksi, jadi jangan dijalankan. Pengecualian: `workers/gas-tiruan`, yang memang khusus staging.
-    - Database hanya Gedung 2 (`dnnqrslftndcbmnvuveb`). Jangan menjalankan SQL di Gedung 1, dan jangan memakai kunci atau secret produksi.
-    - Masuk ke staging hanya dengan token uji (`docs/GEDUNG-DAN-STAGING.md` §2).
-    - Setiap sesi dicatat di `docs/PROGRES.md` di branch `staging`, beserta cara mengujinya, supaya ujinya bisa diulang sebelum dibawa ke produksi.
+16. **Kerja Raka sudah diserahkan ke Gabriel (+ Claude)** (keputusan Gabriel, 13 Nov). Izin staging 2 Nov tidak berlaku lagi.
+    - Tag `raka-akhir-2026-11-11` (`3e55ca8`) menyimpan kerja Raka apa adanya.
+    - Branch `staging` dilanjutkan Gabriel (+ Claude) di Gedung 2. Ia baru boleh di-merge ke `main` setelah lulus uji fungsi (butir 15). Yang wajib diperbaiki lebih dulu ada di `docs/PROGRES.md`, entri 13 Nov.
+    - Jangan ikut menyalin:
+      - berkas `docs/panduan_deploy_staging_kamis*.md`;
+      - data rekaan di `workers/pintu/src/user-admin.js`;
+      - tarif dan faktor yang tertulis mati;
+      - pemilih jalur dari klien (`?uji=supabase`, header `X-Active-Engine`, `engine` di body).
 
 ---
 
