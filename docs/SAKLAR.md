@@ -58,7 +58,7 @@ Kalau ada masalah, saklar dibalik dari `dua_cabang` kembali ke `gas`.
 
 ## Panel saklar di `abadiops.com` (keputusan Gabriel, 29 Okt 2026)
 
-Saklar dioperasikan dari **satu panel visual di domain pintu**. Kode rumah sekarang adalah `sum`, `kmbtra` (dulu `kmb`), dan `kmbprojek` (dulu `kmb-projek`).
+Saklar dioperasikan dari **satu panel visual di domain pintu**. Daftar kamar dan profilnya ada di `config/rumah.json`, dan kamar yang aktif per lingkungan diatur `RUMAH` di `workers/pintu/wrangler.toml`. Panel membangun tab, pilihan, section, dan peran dari daftar itu. Kode lama: `kmbtra` dulu `kmb`, `kmbprojek` dulu `kmb-projek`.
 
 **Letak dan akses**
 - Panel ada di alamat `abadiops.com` yang **tidak ditautkan dari mana pun**. Tujuannya sedikit tersembunyi, bukan untuk keamanan.

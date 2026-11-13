@@ -12,6 +12,34 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: daftar kamar dari konfigurasi, langkah 1 rencana BUPR)
+- Berubah:
+  - **Langkah 1a** (`bd6e173`): `config/rumah.json` menjadi satu-satunya profil kamar (nama, skema, awalan fungsi, awalan token, section, peran) untuk keempat kamar, termasuk `kmbbupr`. Kamar yang aktif per lingkungan tetap diatur `RUMAH` di `wrangler.toml`.
+    - pintu: SaklarDO memberi posisi bawaan untuk setiap kamar di `RUMAH` dan menolak kode kamar yang tidak dikenal. `/saklar/api/status` mengirim profil kamar, dan `user-admin` membaca awalan fungsi dan token dari profil;
+    - Worker rumah membaca saklarnya sendiri lewat ikatan `PINTU` dengan kunci `env.RUMAH`, tanpa alamat tertanam dan tanpa cadangan ke saklar kamar lain. KMB TRA memakai kode `kmbtra`;
+    - GAS tiruan: kamar diambil dari profil, dan token ajaib `uji-palsu-*`/`test-*` dibuang.
+  - **Langkah 1b:** panel saklar tidak lagi menulis daftar kamar sendiri.
+    - Tab kamar, pilihan kamar, section, dan peran di modal pengguna dibangun dari `rumah_list`.
+    - Bawaan `'sum'` diganti kamar pertama di `RUMAH` (sekarang `kmbprojek`), jadi tab yang pertama terbuka sekarang KMB Projek.
+    - Keterangan dan label navigasi tidak lagi menyebut nama skema, awalan token, atau "3 Rumah".
+    - Menambah kamar ke panel cukup lewat `config/rumah.json` dan `RUMAH`, tanpa menyentuh `saklar.html`.
+  - **BUPR di Gedung 2:** `kmbbupr` dicermin sekali, 14 Nov 01.28 WIB: 26 tabel, 12.932 baris, AuditLogs dilewati. Skema ini belum punya fungsi dan belum ikut jadwal cermin tiap jam, karena jadwal itu menulis ke Gedung 1.
+  - **Tayang di staging:** pintu `70210f5a`, sum `c286e6a7`, kmb `37ece31b`, kmbprojek `ef4e3e6b`, GAS tiruan `d3730d00`.
+    - Pintu versi 1a tayang tanpa source map. Sebelum ditimpa, bundelnya dibandingkan dengan bundel uji-bangun branch dan hasilnya sama persis. Halaman panelnya juga sama dengan commit.
+  - **Uji** (tidak mengubah posisi saklar ataupun data):
+    - kamar karangan ditolak oleh saklar (400) dan GAS tiruan, dan token ajaib `uji-palsu-spt-sum` ditolak;
+    - `/api/sehat` ketiga Worker rumah melaporkan kamar dan posisi saklar yang sama dengan panel;
+    - halaman panel yang tayang dijalankan di `happy-dom` dengan data staging sungguhan, dan tombolnya diklik:
+      - tab dan pilihan: `kmbprojek, sum, kmbtra, semua`;
+      - pengguna 24, 56, dan 41 (gabungan 121);
+      - unit config 28, 47, dan 103 (gabungan 178);
+      - section dan peran di modal pengguna sesuai profil;
+      - tidak ada galat JavaScript.
+- Belum selesai / berikutnya:
+  - `kmbbupr` belum masuk `RUMAH` staging. Ia dipasang di langkah 3 bersama Worker-nya, supaya panel tidak menampilkan kamar yang belum punya fungsi.
+  - Langkah 2 rencana BUPR: fungsi Gedung 2 untuk `kmbbupr`, memakai ulang fungsi KMB Project dan ditambah aturan WO mandiri.
+  - Bawaan tampilan `'kmbprojek'` di `web-handler.js:906` KMB Project dibereskan di langkah 3.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: kerja Raka 13 Nov dipulihkan; buku tamu kiriman aman, butir 5)
 - Berubah:
   - **Kerja Raka yang tidak pernah di-commit ditemukan dan dipulihkan** (`9ef10ca`):

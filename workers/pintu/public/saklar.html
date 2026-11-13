@@ -209,8 +209,8 @@
     <div id="viewDashboard" class="hidden">
       <div class="nav-tabs">
         <button type="button" class="nav-tab active" id="tabBtnSaklar" onclick="pilihTab('saklar')">🎛️ Saklar Dua Cabang</button>
-        <button type="button" class="nav-tab" id="tabBtnUsers" onclick="pilihTab('users')">👷 Manajemen Pengguna & Token (Pusat 3 Rumah)</button>
-        <button type="button" class="nav-tab" id="tabBtnConfig" onclick="pilihTab('config')">⚙️ Manajemen Config & Master Data (Pusat 3 Rumah)</button>
+        <button type="button" class="nav-tab" id="tabBtnUsers" onclick="pilihTab('users')">👷 Manajemen Pengguna & Token (Pusat Semua Rumah)</button>
+        <button type="button" class="nav-tab" id="tabBtnConfig" onclick="pilihTab('config')">⚙️ Manajemen Config & Master Data (Pusat Semua Rumah)</button>
       </div>
 
       <!-- TAB A: SAKLAR DUA CABANG -->
@@ -250,7 +250,7 @@
       <div id="sectionUsers" class="hidden viewUserAdmin" data-view="viewUserAdmin">
         <div class="info-banner">
           <strong>Manajemen Pengguna Terpusat (Supabase Per Kamar):</strong>
-          Setiap rumah menyimpan datanya di kamarnya sendiri (<code>sum</code>, <code>kmb</code>, <code>kmb_projek</code>). Orang tidak pernah dihapus (hanya dinonaktifkan) agar riwayat WO dan payroll tetap utuh. Token baru otomatis memakai awalan rumah (<code>sum-</code>, <code>kmb-</code>, <code>kmbp-</code>) dan diperiksa lintas rumah agar tidak pernah kembar.
+          Setiap rumah menyimpan datanya di skema Supabase-nya sendiri (nama skema tertera di tombol rumah di bawah). Orang tidak pernah dihapus (hanya dinonaktifkan) agar riwayat WO dan payroll tetap utuh. Token baru otomatis memakai awalan khusus rumahnya dan diperiksa lintas rumah agar tidak pernah kembar.
         </div>
 
         <div id="userAlert" class="alert hidden"></div>
@@ -266,20 +266,14 @@
 
           <!-- Pilihan Cepat Sistem / Rumah (Tab Per Rumah) -->
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.85rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border);" id="rumahTabsUsers">
-            <button type="button" class="btn btn-primary btn-sm" data-rumah-usr="sum" onclick="pilihRumahTabUser('sum')">🚜 SUM V2 (sum)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-usr="kmbtra" onclick="pilihRumahTabUser('kmbtra')">🚛 KMB TRA / V2 (kmb)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-usr="kmbprojek" onclick="pilihRumahTabUser('kmbprojek')">⚙️ KMB Projek (kmb_projek)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-usr="semua" onclick="pilihRumahTabUser('semua')">🏢 Semua Rumah (Gabungan)</button>
+            <!-- Diisi perbaruiTabRumah() dari daftar kamar (rumah_list). -->
           </div>
 
           <div class="toolbar">
             <div class="toolbar-item">
               <label for="filterRumah">Pilih Rumah (Kamar Supabase)</label>
               <select id="filterRumah" class="form-control" onchange="gantiPilihanRumah()">
-                <option value="sum">SUM V2 (skema sum)</option>
-                <option value="kmbtra">KMB TRA / V2 (skema kmb)</option>
-                <option value="kmbprojek">KMB Projek (skema kmb_projek)</option>
-                <option value="semua">Semua Rumah (Gabungan)</option>
+                <option value="">Memuat daftar kamar…</option>
               </select>
             </div>
             <div class="toolbar-item" style="min-width:220px;">
@@ -346,7 +340,7 @@
       <div id="sectionConfig" class="hidden">
         <div class="info-banner">
           <strong>Manajemen Master Data Config Terpusat (Supabase Per Kamar):</strong>
-          Sama persis seperti Manajemen Pengguna, setiap sistem/rumah menyimpan master data konfigurasinya di kamarnya sendiri (<code>sum</code>, <code>kmb</code>, <code>kmb_projek</code>). Anda dapat memfilter per sistem/rumah (<strong>SUM V2</strong>, <strong>KMB TRA / V2</strong>, <strong>KMB Projek</strong>, atau <strong>Semua Rumah</strong>) dan melakukan <strong>Tambah (Create)</strong>, <strong>Lihat (Read)</strong>, <strong>Ubah (Update)</strong>, serta <strong>Hapus (Delete)</strong> untuk <code>config_units</code>, <code>config_components</code>, <code>catalog_jobs</code>, dan <code>config_factors</code>.
+          Sama persis seperti Manajemen Pengguna, setiap kamar menyimpan master data konfigurasinya di skema Supabase-nya sendiri. Anda dapat memfilter per kamar atau melihat <strong>Semua Rumah</strong>, lalu melakukan <strong>Tambah (Create)</strong>, <strong>Lihat (Read)</strong>, <strong>Ubah (Update)</strong>, serta <strong>Hapus (Delete)</strong> untuk <code>config_units</code>, <code>config_components</code>, <code>catalog_jobs</code>, dan <code>config_factors</code>.
         </div>
 
         <div id="configAlert" class="alert hidden"></div>
@@ -362,10 +356,7 @@
 
           <!-- Pilihan Cepat Sistem / Rumah (Tab Per Rumah) -->
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.85rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border);" id="rumahTabsConfig">
-            <button type="button" class="btn btn-primary btn-sm" data-rumah-cfg="sum" onclick="pilihRumahTabConfig('sum')">🚜 SUM V2 (sum)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-cfg="kmbtra" onclick="pilihRumahTabConfig('kmbtra')">🚛 KMB TRA / V2 (kmb)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-cfg="kmbprojek" onclick="pilihRumahTabConfig('kmbprojek')">⚙️ KMB Projek (kmb_projek)</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-rumah-cfg="semua" onclick="pilihRumahTabConfig('semua')">🏢 Semua Rumah (Gabungan)</button>
+            <!-- Diisi perbaruiTabRumah() dari daftar kamar (rumah_list). -->
           </div>
 
           <!-- Pilihan Kategori Master Data Config -->
@@ -380,10 +371,7 @@
             <div class="toolbar-item">
               <label for="filterRumahConfig">Pilih Rumah (Kamar Supabase)</label>
               <select id="filterRumahConfig" class="form-control" onchange="gantiRumahConfigPusat()">
-                <option value="sum">SUM V2 (skema sum)</option>
-                <option value="kmbtra">KMB TRA / V2 (skema kmb)</option>
-                <option value="kmbprojek">KMB Projek (skema kmb_projek)</option>
-                <option value="semua">Semua Rumah (Gabungan)</option>
+                <option value="">Memuat daftar kamar…</option>
               </select>
             </div>
             <div class="toolbar-item" style="min-width:220px;">
@@ -476,9 +464,7 @@
           <div class="form-group">
             <label for="uRumah">Rumah Target *</label>
             <select id="uRumah" class="form-control" required onchange="sesuaikanFormRumah()">
-              <option value="sum">SUM V2 (skema sum)</option>
-              <option value="kmbtra">KMB TRA / V2 (skema kmb)</option>
-              <option value="kmbprojek">KMB Projek (skema kmb_projek)</option>
+              <option value="">Memuat daftar kamar…</option>
             </select>
           </div>
           <div class="form-group">
@@ -567,11 +553,36 @@
     let TOKEN_SESI = localStorage.getItem('abadi_saklar_token') || '';
     let TARGET_RUMAH_MODAL = '';
     let TARGET_POSISI_MODAL = '';
-    let DAFTAR_RUMAH = [
-      { kode: 'kmbprojek', nama: 'KMB Projek' },
-      { kode: 'sum', nama: 'SUM V2' },
-      { kode: 'kmbtra', nama: 'KMB TRA' }
-    ];
+    // Daftar kamar beserta profilnya (skema, section, peran), diisi dari /saklar/api/status (rumah_list).
+    // Sumbernya RUMAH di wrangler.toml pintu dan config/rumah.json; panel tidak menulis daftar kamar sendiri.
+    let DAFTAR_RUMAH = [];
+
+    function rumahPertama() {
+      return (DAFTAR_RUMAH[0] && DAFTAR_RUMAH[0].kode) || '';
+    }
+
+    function profilRumah(kode) {
+      return DAFTAR_RUMAH.find((x) => x.kode === kode) || null;
+    }
+
+    // Section kamar sebagai [{ id, label }]; kosong berarti kamar tanpa section.
+    function sectionRumah(kode) {
+      const p = profilRumah(kode);
+      return (p && Array.isArray(p.section) ? p.section : []).map(([id, label]) => ({ id, label }));
+    }
+
+    function perbaruiTabRumah() {
+      const tombol = (atribut, fungsi) => DAFTAR_RUMAH
+        .map((r) => `<button type="button" class="btn btn-secondary btn-sm" ${atribut}="${escapeAttr(r.kode)}" onclick="${fungsi}('${escapeAttr(r.kode)}')">${escapeHtml(r.nama)} (${escapeHtml(r.skema || r.kode)})</button>`)
+        .concat(`<button type="button" class="btn btn-secondary btn-sm" ${atribut}="semua" onclick="${fungsi}('semua')">🏢 Semua Rumah (Gabungan)</button>`)
+        .join('');
+      const tabUser = document.getElementById('rumahTabsUsers');
+      if (tabUser) tabUser.innerHTML = tombol('data-rumah-usr', 'pilihRumahTabUser');
+      const tabCfg = document.getElementById('rumahTabsConfig');
+      if (tabCfg) tabCfg.innerHTML = tombol('data-rumah-cfg', 'pilihRumahTabConfig');
+      sinkronTabRumahUserUI();
+      sinkronTabRumahConfigUI();
+    }
     let DATA_USERS = [];
     let TOKEN_TERBUKA = {};
     let TOKEN_ADMIN_PER_RUMAH = JSON.parse(sessionStorage.getItem('abadi_admin_tokens') || '{}');
@@ -697,24 +708,26 @@
     }
 
     function perbaruiDropdownRumah() {
+      const label = (r) => `${escapeHtml(r.nama)} (skema ${escapeHtml(r.skema || r.kode)})`;
       const selFilter = document.getElementById('filterRumah');
-      const nilaiLama = selFilter.value || 'sum';
-      selFilter.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${escapeHtml(r.nama)} (${escapeHtml(r.kode)})</option>`).join('')
+      const nilaiLama = selFilter.value || rumahPertama();
+      selFilter.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${label(r)}</option>`).join('')
         + '<option value="semua">Semua Rumah (Gabungan)</option>';
       if ([...selFilter.options].some(o => o.value === nilaiLama)) selFilter.value = nilaiLama;
 
       const selModal = document.getElementById('uRumah');
-      const modalLama = selModal.value || 'sum';
-      selModal.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${escapeHtml(r.nama)} (${escapeHtml(r.kode)})</option>`).join('');
+      const modalLama = selModal.value || rumahPertama();
+      selModal.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${label(r)}</option>`).join('');
       if ([...selModal.options].some(o => o.value === modalLama)) selModal.value = modalLama;
 
       const selFilterCfg = document.getElementById('filterRumahConfig');
       if (selFilterCfg) {
-        const cfgLama = selFilterCfg.value || 'sum';
-        selFilterCfg.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${escapeHtml(r.nama)} (${escapeHtml(r.kode)})</option>`).join('')
+        const cfgLama = selFilterCfg.value || rumahPertama();
+        selFilterCfg.innerHTML = DAFTAR_RUMAH.map(r => `<option value="${escapeHtml(r.kode)}">${label(r)}</option>`).join('')
           + '<option value="semua">Semua Rumah (Gabungan)</option>';
         if ([...selFilterCfg.options].some(o => o.value === cfgLama)) selFilterCfg.value = cfgLama;
       }
+      perbaruiTabRumah();
     }
 
     function renderCards(switches) {
@@ -851,7 +864,7 @@
     /* ── MANAJEMEN PENGGUNA & TOKEN LINTAS RUMAH ───────────────────────────── */
 
     function sinkronTabRumahUserUI() {
-      const r = document.getElementById('filterRumah').value || 'sum';
+      const r = document.getElementById('filterRumah').value || rumahPertama();
       document.querySelectorAll('#rumahTabsUsers [data-rumah-usr]').forEach((btn) => {
         const aktif = btn.getAttribute('data-rumah-usr') === r;
         btn.className = 'btn btn-sm ' + (aktif ? 'btn-primary' : 'btn-secondary');
@@ -897,7 +910,7 @@
     }
 
     async function muatDaftarUser() {
-      const rumah = document.getElementById('filterRumah').value || 'sum';
+      const rumah = document.getElementById('filterRumah').value || rumahPertama();
       const tok = document.getElementById('inputAdminToken').value.trim();
       const tbody = document.getElementById('userTableBody');
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:var(--text-muted);">Memuat pengguna dari Supabase...</td></tr>';
@@ -970,7 +983,7 @@
         const tampilToken = u.token
           ? (terbuka ? u.token : (u.token_masked || (u.token.slice(0, 4) + '…')))
           : null;
-        const infoBagian = u.rumah === 'sum'
+        const infoBagian = !sectionRumah(u.rumah).length
           ? [u.jabatan_aktual, u.golongan ? `Gol. ${u.golongan}` : ''].filter(Boolean).join(' · ') || '—'
           : [u.section, u.position || u.grade].filter(Boolean).join(' · ') || 'semua';
 
@@ -1029,19 +1042,6 @@
       }
     }
 
-    const DAFTAR_SECTION_RUMAH = {
-      kmbprojek: [
-        { id: 'maintenance', label: 'Maintenance' },
-        { id: 'vessel', label: 'Vessel' }
-      ],
-      kmbtra: [
-        { id: 'field', label: 'Field' },
-        { id: 'workshop', label: 'Workshop' },
-        { id: 'tyreman', label: 'Tyreman' }
-      ],
-      sum: []
-    };
-
     function parseSectionList(val) {
       if (!val) return [];
       if (Array.isArray(val)) return val.map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
@@ -1067,7 +1067,7 @@
       const labelTampil = document.getElementById('lblTampilSection');
       const grupSec = document.getElementById('grupSection');
 
-      if (rumah === 'sum') {
+      if (!sectionRumah(rumah).length) {
         if (grupSec) grupSec.style.display = 'none';
         if (inputHidden) inputHidden.value = '';
         if (labelTampil) labelTampil.textContent = 'Pilih Section...';
@@ -1075,7 +1075,7 @@
       }
       if (grupSec) grupSec.style.display = 'block';
 
-      const opsiTersedia = DAFTAR_SECTION_RUMAH[rumah] || [];
+      const opsiTersedia = sectionRumah(rumah);
 
       let terpilih = [];
       if (nilaiAwal !== null && nilaiAwal !== undefined) {
@@ -1110,7 +1110,7 @@
 
       const checkedBoxes = Array.from(container.querySelectorAll('input[type="checkbox"]:checked'));
       const vals = checkedBoxes.map(cb => cb.value);
-      const opsi = DAFTAR_SECTION_RUMAH[rumah] || [];
+      const opsi = sectionRumah(rumah);
       const labels = checkedBoxes.map(cb => {
         const f = opsi.find(o => o.id === cb.value);
         return f ? f.label : cb.value;
@@ -1132,19 +1132,8 @@
       const selPeran = document.getElementById('uPeran');
       const peranSekarang = selPeran.value || 'mechanic';
 
-      const opsiPeran = r === 'sum'
-        ? [
-            ['mechanic', 'Mekanik'],
-            ['supervisor', 'Supervisor (L1)'],
-            ['superintendent', 'Superintendent (L2)'],
-            ['foreman', 'Foreman (SUM)'],
-            ['foreman_approver', 'Foreman Approver (SUM)']
-          ]
-        : [
-            ['mechanic', 'Mekanik'],
-            ['supervisor', 'Supervisor / Planner (L1)'],
-            ['superintendent', 'Superintendent / Manager (L2)']
-          ];
+      const profil = profilRumah(r);
+      const opsiPeran = (profil && Array.isArray(profil.peran) && profil.peran.length) ? profil.peran : [['mechanic', 'Mekanik']];
 
       selPeran.innerHTML = opsiPeran.map(([k, lbl]) => `<option value="${k}">${lbl}</option>`).join('');
       if (opsiPeran.some(([k]) => k === peranSekarang)) selPeran.value = peranSekarang;
@@ -1154,7 +1143,7 @@
 
     function bukaModalUserBaru() {
       const rFilter = document.getElementById('filterRumah').value;
-      const rDefault = (rFilter && rFilter !== 'semua') ? rFilter : 'sum';
+      const rDefault = (rFilter && rFilter !== 'semua') ? rFilter : rumahPertama();
       document.getElementById('judulModalUser').textContent = 'Tambah Pengguna Baru';
       document.getElementById('uRumah').value = rDefault;
       document.getElementById('uRumah').disabled = false;
@@ -1164,7 +1153,8 @@
       document.getElementById('uNama').value = '';
       document.getElementById('uEmail').value = '';
       document.getElementById('uPeran').value = 'mechanic';
-      aturPilihanSection(rDefault, rDefault === 'kmbprojek' ? ['maintenance'] : ['field']);
+      const secAwal = sectionRumah(rDefault);
+      aturPilihanSection(rDefault, secAwal.length ? [secAwal[0].id] : []);
       document.getElementById('uJabatan').value = 'junior';
       document.getElementById('uGolongan').value = '';
       document.getElementById('uAktif').checked = true;
@@ -1178,7 +1168,7 @@
 
     function bukaModalUbahUser(u) {
       document.getElementById('judulModalUser').textContent = `Ubah Pengguna: ${u.name}`;
-      document.getElementById('uRumah').value = u.rumah || 'sum';
+      document.getElementById('uRumah').value = u.rumah || rumahPertama();
       document.getElementById('uRumah').disabled = true;
       sesuaikanFormRumah();
       document.getElementById('uKode').value = u.mechanic_id || '';
@@ -1186,7 +1176,7 @@
       document.getElementById('uNama').value = u.name || '';
       document.getElementById('uEmail').value = u.email || '';
       document.getElementById('uPeran').value = u.role || 'mechanic';
-      aturPilihanSection(u.rumah || 'sum', u.section || '');
+      aturPilihanSection(u.rumah || rumahPertama(), u.section || '');
       document.getElementById('uJabatan').value = u.jabatan_aktual || u.position || u.grade || '';
       document.getElementById('uGolongan').value = u.golongan || '';
       document.getElementById('uAktif').checked = (u.status || 'ACTIVE').toUpperCase() === 'ACTIVE';
@@ -1363,7 +1353,7 @@
     let DATA_CFG_PUSAT = { units: [], components: [], jobs: [], factors: [] };
 
     function sinkronTabRumahConfigUI() {
-      const r = document.getElementById('filterRumahConfig').value || 'sum';
+      const r = document.getElementById('filterRumahConfig').value || rumahPertama();
       document.querySelectorAll('#rumahTabsConfig [data-rumah-cfg]').forEach((btn) => {
         const aktif = btn.getAttribute('data-rumah-cfg') === r;
         btn.className = 'btn btn-sm ' + (aktif ? 'btn-primary' : 'btn-secondary');
@@ -1424,7 +1414,7 @@
     }
 
     async function muatDataConfigPusat() {
-      const rumah = document.getElementById('filterRumahConfig').value || 'sum';
+      const rumah = document.getElementById('filterRumahConfig').value || rumahPertama();
       const adminToken = document.getElementById('inputAdminTokenConfig').value.trim() || TOKEN_ADMIN_PER_RUMAH[rumah] || '';
       const tbody = document.getElementById('tbodyConfigPusat');
       sinkronTabRumahConfigUI();
@@ -1453,7 +1443,7 @@
           return;
         }
         const d = data.result || data.data || data || {};
-        const tagDefault = (arr) => (Array.isArray(arr) ? arr.map((x) => ({ ...x, rumah: x.rumah || (rumah === 'semua' ? 'kmbprojek' : rumah) })) : []);
+        const tagDefault = (arr) => (Array.isArray(arr) ? arr.map((x) => ({ ...x, rumah: x.rumah || (rumah === 'semua' ? '' : rumah) })) : []);
         DATA_CFG_PUSAT = {
           units: tagDefault(d.units || data.units),
           components: tagDefault(d.components || data.components),
@@ -1589,7 +1579,7 @@
       const box = document.getElementById('isiFormConfigPusat');
       const t = SUB_TAB_CFG;
       const rFilter = document.getElementById('filterRumahConfig').value;
-      const rTarget = (item && item.rumah) ? item.rumah : ((rFilter && rFilter !== 'semua') ? rFilter : 'sum');
+      const rTarget = (item && item.rumah) ? item.rumah : ((rFilter && rFilter !== 'semua') ? rFilter : rumahPertama());
       document.getElementById('judulModalConfigPusat').textContent = (item ? 'Ubah ' : 'Tambah ') + t.toUpperCase();
 
       const opsiRumahHtml = DAFTAR_RUMAH.map((r) => `<option value="${escapeHtml(r.kode)}" ${r.kode === rTarget ? 'selected' : ''}>${escapeHtml(r.nama)} (${escapeHtml(r.kode)})</option>`).join('');
@@ -1679,7 +1669,7 @@
     async function simpanConfigPusat() {
       const rumahEl = document.getElementById('p_cfg_rumah');
       const rFilter = document.getElementById('filterRumahConfig').value;
-      const rumah = (rumahEl && rumahEl.value) ? rumahEl.value : ((rFilter && rFilter !== 'semua') ? rFilter : 'sum');
+      const rumah = (rumahEl && rumahEl.value) ? rumahEl.value : ((rFilter && rFilter !== 'semua') ? rFilter : rumahPertama());
       const adminToken = TOKEN_ADMIN_PER_RUMAH[rumah] || document.getElementById('inputAdminTokenConfig').value.trim() || document.getElementById('inputAdminToken').value.trim() || '';
       const t = SUB_TAB_CFG;
       const v = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -1719,7 +1709,7 @@
 
     async function hapusConfigPusat(rumahItem, jenis, kunci) {
       const rFilter = document.getElementById('filterRumahConfig').value;
-      const rumah = (rumahItem && rumahItem !== 'semua') ? rumahItem : ((rFilter && rFilter !== 'semua') ? rFilter : 'sum');
+      const rumah = (rumahItem && rumahItem !== 'semua') ? rumahItem : ((rFilter && rFilter !== 'semua') ? rFilter : rumahPertama());
       if (!confirm(`Hapus item config ${jenis} "${kunci}" dari sistem/rumah ${rumah}?`)) return;
       const adminToken = TOKEN_ADMIN_PER_RUMAH[rumah] || document.getElementById('inputAdminTokenConfig').value.trim() || document.getElementById('inputAdminToken').value.trim() || '';
       try {
