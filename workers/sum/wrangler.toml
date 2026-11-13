@@ -51,6 +51,12 @@ services = [
   { binding = "PINTU", service = "abadiops-pintu-staging" }
 ]
 
+# Buku tamu kiriman: ikatan langsung ke SaklarDO milik pintu staging, tanpa rute publik (butir 5 serah-terima 13 Nov).
+[env.staging.durable_objects]
+bindings = [
+  { name = "SAKLAR_DO", class_name = "SaklarDO", script_name = "abadiops-pintu-staging" }
+]
+
 [env.staging.vars]
 RUMAH = "sum"
 SAKLAR = "supabase"

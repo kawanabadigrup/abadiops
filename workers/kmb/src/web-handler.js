@@ -715,7 +715,7 @@ export async function handleWebBridgeApi(request, env, url) {
   // Buku Tamu Kiriman (Idempotency Store di Cloudflare, docs/SAKLAR.md)
   const opId = body.op_id || body.kiriman_id || data.op_id || data.kiriman_id;
   if (opId) {
-    const cached = await cekBukuTamu(opId, env);
+    const cached = await cekBukuTamu(opId, token, env);
     if (cached && cached.result) {
       return new Response(JSON.stringify(cached.result), {
         status: 200,
@@ -742,7 +742,7 @@ export async function handleWebBridgeApi(request, env, url) {
           try {
             const klon = resSupa.clone();
             const dataResult = await klon.json();
-            await catatBukuTamu(opId, dataResult, env.RUMAH || 'kmbtra', env);
+            await catatBukuTamu(opId, token, dataResult, env);
           } catch (_) {}
         }
         return resSupa;
@@ -803,7 +803,7 @@ export async function handleWebBridgeApi(request, env, url) {
     if (res.ok && opId) {
       try {
         const dataResult = JSON.parse(resText);
-        await catatBukuTamu(opId, dataResult, env.RUMAH || 'kmbtra', env);
+        await catatBukuTamu(opId, token, dataResult, env);
       } catch (_) {}
     }
     return new Response(resText, {

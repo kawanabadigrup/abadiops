@@ -7,7 +7,11 @@
  * - Nilai tersimpan persisten di storage Durable Object.
  * - Default posisi awal: 'gas' untuk semua rumah.
  * - Riwayat audit log tersimpan hingga 50 entri terakhir.
+ * - Buku tamu kiriman (tabel SQLite buku_tamu): hanya untuk Worker rumah lewat ikatan Durable Object.
  */
+
+// Umur catatan buku tamu. Kiriman yang dikirim ulang lebih dari 30 hari kemudian diproses seperti kiriman baru.
+const UMUR_BUKU_TAMU_MS = 30 * 24 * 60 * 60 * 1000;
 
 export class SaklarDO {
   constructor(ctx, env) {
@@ -37,6 +41,27 @@ export class SaklarDO {
     return history;
   }
 
+  // Tabel buku tamu, sekali per instance. Catatan model lama (kunci 'op:<op_id>' tanpa rumah, pemilik,
+  // dan umur) tidak terbaca lagi oleh kode ini, jadi dibuang sekalian.
+  async siapkanBukuTamu() {
+    if (this.bukuTamuSiap) return;
+    this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS buku_tamu (
+      rumah     TEXT    NOT NULL,
+      op_id     TEXT    NOT NULL,
+      pemilik   TEXT    NOT NULL,
+      hasil     TEXT    NOT NULL,
+      dibuat_at INTEGER NOT NULL,
+      PRIMARY KEY (rumah, op_id)
+    )`);
+    this.ctx.storage.sql.exec('CREATE INDEX IF NOT EXISTS buku_tamu_umur ON buku_tamu (dibuat_at)');
+    for (;;) {
+      const lama = await this.ctx.storage.list({ prefix: 'op:', limit: 128 });
+      if (lama.size === 0) break;
+      await this.ctx.storage.delete([...lama.keys()]);
+    }
+    this.bukuTamuSiap = true;
+  }
+
   async fetch(request, init) {
     const reqUrl = typeof request === 'string' ? request : (request && request.url ? request.url : '');
     const url = new URL(reqUrl, 'https://saklar.internal');
@@ -51,18 +76,10 @@ export class SaklarDO {
       });
     }
 
-    // Buku Tamu Kiriman (Idempotency Store di Cloudflare, docs/SAKLAR.md)
-    if (action === 'buku_tamu_cek') {
-      const opId = url.searchParams.get('op_id');
-      if (!opId) return new Response(JSON.stringify({ found: false }), { headers: { 'Content-Type': 'application/json' } });
-      const record = await this.ctx.storage.get('op:' + opId);
-      if (record) {
-        return new Response(JSON.stringify({ found: true, record }), { headers: { 'Content-Type': 'application/json' } });
-      }
-      return new Response(JSON.stringify({ found: false }), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (action === 'buku_tamu_simpan' && method === 'POST') {
+    // Buku Tamu Kiriman (docs/SAKLAR.md). Hanya dipanggil Worker rumah lewat ikatan Durable Object;
+    // pintu tidak punya rute publik untuknya. Catatan dikunci per rumah + op_id, dan hasilnya hanya
+    // diberikan kepada pemilik token yang sama (sidik SHA-256 token, bukan tokennya).
+    if ((action === 'buku_tamu_cek' || action === 'buku_tamu_simpan') && method === 'POST') {
       let body = {};
       try {
         if (typeof request !== 'string' && request && typeof request.json === 'function') {
@@ -71,16 +88,30 @@ export class SaklarDO {
           body = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
         }
       } catch (_) {}
-      const opId = body.op_id;
-      if (opId) {
-        const record = {
-          op_id: opId,
-          result: body.result,
-          timestamp: new Date().toISOString(),
-          rumah: body.rumah || 'unknown'
-        };
-        await this.ctx.storage.put('op:' + opId, record);
+      const rumah = String(body.rumah || '').trim();
+      const opId = String(body.op_id || '').trim();
+      const pemilik = String(body.pemilik || '').trim();
+      if (!rumah || !opId || !/^[0-9a-f]{64}$/.test(pemilik)) {
+        return new Response(JSON.stringify({ success: false, error: 'rumah, op_id, dan sidik pemilik wajib' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
+      await this.siapkanBukuTamu();
+      const sql = this.ctx.storage.sql;
+      const batas = Date.now() - UMUR_BUKU_TAMU_MS;
+      if (action === 'buku_tamu_cek') {
+        const baris = sql.exec('SELECT pemilik, hasil, dibuat_at FROM buku_tamu WHERE rumah = ? AND op_id = ?', rumah, opId).toArray()[0];
+        if (!baris || baris.dibuat_at < batas || baris.pemilik !== pemilik) {
+          return new Response(JSON.stringify({ found: false }), { headers: { 'Content-Type': 'application/json' } });
+        }
+        const record = { op_id: opId, rumah, result: JSON.parse(baris.hasil), timestamp: new Date(baris.dibuat_at).toISOString() };
+        return new Response(JSON.stringify({ found: true, record }), { headers: { 'Content-Type': 'application/json' } });
+      }
+      // Catatan pertama yang menang, seperti ProcessedOps. Catatan kedaluwarsa dibuang lebih dulu.
+      sql.exec('DELETE FROM buku_tamu WHERE dibuat_at < ?', batas);
+      sql.exec('INSERT OR IGNORE INTO buku_tamu (rumah, op_id, pemilik, hasil, dibuat_at) VALUES (?, ?, ?, ?, ?)',
+        rumah, opId, pemilik, JSON.stringify(body.result === undefined ? null : body.result), Date.now());
       return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
     }
 

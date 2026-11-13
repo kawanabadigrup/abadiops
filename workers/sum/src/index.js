@@ -92,7 +92,7 @@ async function tanganiApi(request, env, url) {
   // Buku Tamu Kiriman (Idempotency Store di Cloudflare, docs/SAKLAR.md)
   const opId = parsed.op_id || parsed.kiriman_id || parsed.data?.op_id || parsed.data?.kiriman_id;
   if (opId) {
-    const cached = await cekBukuTamu(opId, env);
+    const cached = await cekBukuTamu(opId, token, env);
     if (cached && cached.result) {
       return new Response(JSON.stringify(cached.result), {
         status: 200,
@@ -122,7 +122,7 @@ async function tanganiApi(request, env, url) {
         try {
           const klon = resSupa.clone();
           const dataResult = await klon.json();
-          await catatBukuTamu(opId, dataResult, env.RUMAH || 'sum', env);
+          await catatBukuTamu(opId, token, dataResult, env);
         } catch (_) {}
       }
       return resSupa;
@@ -141,7 +141,7 @@ async function tanganiApi(request, env, url) {
         try {
           const klon = fallbackSupa.clone();
           const dataResult = await klon.json();
-          await catatBukuTamu(opId, dataResult, env.RUMAH || 'sum', env);
+          await catatBukuTamu(opId, token, dataResult, env);
         } catch (_) {}
       }
       return fallbackSupa;
@@ -154,7 +154,7 @@ async function tanganiApi(request, env, url) {
     try {
       const klon = resGas.clone();
       const dataResult = await klon.json();
-      await catatBukuTamu(opId, dataResult, env.RUMAH || 'sum', env);
+      await catatBukuTamu(opId, token, dataResult, env);
     } catch (_) {}
   }
   return resGas;

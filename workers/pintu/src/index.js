@@ -300,32 +300,8 @@ export default {
       });
     }
 
-    // API Buku Tamu Kiriman (Idempotency Store di Cloudflare, docs/SAKLAR.md)
-    if (url.pathname === '/api/buku-tamu/cek' && request.method === 'GET') {
-      const stub = getSaklarStub(env);
-      if (!stub) return json({ found: false }, 200, { 'Access-Control-Allow-Origin': '*' });
-      const opId = url.searchParams.get('op_id');
-      const resp = await stub.fetch(`https://saklar.internal/?action=buku_tamu_cek&op_id=${encodeURIComponent(opId || '')}`);
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
-
-    if (url.pathname === '/api/buku-tamu/simpan' && request.method === 'POST') {
-      const stub = getSaklarStub(env);
-      if (!stub) return json({ success: false }, 200, { 'Access-Control-Allow-Origin': '*' });
-      const body = await request.text();
-      const resp = await stub.fetch('https://saklar.internal/?action=buku_tamu_simpan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: body,
-      });
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
+    // Buku tamu kiriman tidak punya rute publik. Rute /api/buku-tamu/* dulu bisa dibaca dan diisi siapa saja;
+    // sekarang Worker rumah memakai SaklarDO langsung lewat ikatan Durable Object (butir 5 serah-terima 13 Nov).
 
     // --- Rute Pintu Utama (Pengenalan Token) ---
     if (url.pathname === '/api/pintu') {
