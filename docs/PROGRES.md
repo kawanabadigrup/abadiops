@@ -25,8 +25,13 @@ Formatnya:
     - token karangan: ditolak;
     - `_sum_admin_daftar_user_internal` dengan kunci publik: 401, permission denied.
   - Jalur pooler IPv4 untuk Gedung 2 (`DATABASE_URL_GEDUNG2_POOLER` di `abadiops.env`), karena IPv6 di komputer kerja putus-sambung.
+  - **Pintu staging di-deploy** (`577d0704`; versi untuk kembali `7ad8cc5a`). Secret `SUPABASE_SERVICE_ROLE_KEY` dipasang: kunci rahasia Gedung 2 `pintu_staging`, khusus Worker ini.
+  - **Uji pintu staging dari luar, tanpa login:** halaman `/saklar` 200; daftar pengguna dan config tanpa login 401; token karangan dan kata ajaib lama ditolak di ketiga rumah; simpan config dengan kata ajaib lama 400.
+  - Dengan kunci rahasia, fungsi `_<rumah>_admin_daftar_user_internal` menjawab (SUM 56, KMB TRA 41, KMB Project 24 pengguna).
+  - **Temuan jaringan:** DNS internet di komputer kerja (14 Nov) membelokkan `*.workers.dev` ke IP AWS, sehingga staging tidak bisa dibuka; `abadiops.com` tidak terkena. Pengguna dengan operator yang sama juga tidak bisa membuka staging. Ini menambah alasan staging butuh domain `abadiops.com` sendiri (#28). Uji dilakukan dengan alamat dari DNS Cloudflare.
 - Belum selesai / berikutnya:
-  - Pasang secret `SUPABASE_SERVICE_ROLE_KEY` (kunci rahasia Gedung 2) di `abadiops-pintu-staging`, deploy pintu staging, lalu uji menu pengguna dan config di panel staging.
+  - Uji menu pengguna dan config di panel staging dengan sesi panel yang sah (login sandi panel staging).
+  - Daftar gabungan pengguna/config ketiga rumah melaporkan `success=true` walaupun ketiganya gagal (`adaSukses || daftarTarget.length > 1`).
   - Aplikasi rumah staging: `admin_simpan_user` mengirim `p_user`, padahal fungsi SQL meminta `p_op_id` dan `p_payload`; `*_admin_set_token_status_bertoken` tidak ada di SQL. Sekarang jalur itu jatuh ke GAS tiruan.
   - Pintu staging dengan binding `GAS_TIRUAN` masih punya jalur token `uji-palsu-spt-<rumah>` kalau `USE_GAS_TIRUAN_ADMIN=true`. Sekarang tidak aktif; dibuang sebelum merge ke `main`.
   - Butir serah-terima berikutnya: 5 (buku tamu kiriman) dan 6 (monitoring SUM membocorkan token).
