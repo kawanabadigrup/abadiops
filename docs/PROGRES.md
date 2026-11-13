@@ -14,7 +14,7 @@ Formatnya:
 
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (deploy pintu produksi: #24 dan #26 tayang)
 - Berubah:
-  - Token Cloudflare `abadiops-deploy` dipasang di `C:devahasiaabadiops.env`. Izinnya Workers di akun kawanabadigrup, serta Workers Routes/DNS edit dan Zone read di abadiops.com. Berlaku sampai 11 Feb 2027.
+  - Token Cloudflare `abadiops-deploy` dipasang di `C:\dev\rahasia\abadiops.env`. Izinnya Workers di akun kawanabadigrup, serta Workers Routes/DNS edit dan Zone read di abadiops.com. Berlaku sampai 11 Feb 2027.
   - Riwayat deploy Cloudflare:
     - Worker produksi terakhir di-deploy 30 Okt. Sejak 2 Nov tidak ada deploy produksi.
     - Pintu staging terakhir di-deploy 12 Nov 13:51 WIB.
