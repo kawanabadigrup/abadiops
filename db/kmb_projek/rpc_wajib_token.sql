@@ -50,30 +50,7 @@ $$;
 -- sedangkan token mekanik (MECH-003) menerima daftar kosong. Pembungkus ini
 -- meniru itu. Kalau uji kembar dengan mekanik yang punya baris di Config_Mechanics
 -- menunjukkan GAS memberi baris dirinya sendiri, sesuaikan di sini.
-CREATE OR REPLACE FUNCTION public.kmb_monitoring_bertoken(p_token text)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-    v_role text;
-    v_hasil json;
-BEGIN
-    SELECT t.role INTO v_role
-      FROM kmb_projek.api_tokens t
-     WHERE t.token = btrim(coalesce(p_token, '')) AND t.status = 'ACTIVE'
-     LIMIT 1;
-    IF NOT FOUND THEN
-        RETURN json_build_object('success', false, 'error', 'Token tidak dikenal / nonaktif', 'source', 'SUPABASE');
-    END IF;
-    v_hasil := public.kmb_monitoring();
-    IF lower(coalesce(v_role, 'mechanic')) = 'mechanic' AND (v_hasil::jsonb #> '{result,mechanics}') IS NOT NULL THEN
-        v_hasil := jsonb_set(v_hasil::jsonb, '{result,mechanics}', '[]'::jsonb)::json;
-    END IF;
-    RETURN v_hasil;
-END;
-$$;
+-- kmb_monitoring_bertoken: definisinya pindah ke db/bersama/monitoring_bertoken.sql (gerbang peran seperti GAS, 14 Nov 2026).
 
 CREATE OR REPLACE FUNCTION public.kmb_my_wos_bertoken(p_token text)
 RETURNS json
@@ -161,6 +138,5 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.kmb_create_refs_bertoken(text) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.kmb_monitoring_bertoken(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_my_wos_bertoken(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_wos_by_status_bertoken(text, text) TO anon, authenticated, service_role;

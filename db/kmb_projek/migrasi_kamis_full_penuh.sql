@@ -746,26 +746,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.kmb_monitoring_bertoken(p_token text)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  v_auth  jsonb := kmb_projek._validasi_token_aktif(p_token);
-  v_hasil jsonb;
-BEGIN
-  IF NOT coalesce((v_auth->>'ok')::boolean, false) THEN
-    RETURN json_build_object('success', false, 'error', v_auth->>'error', 'source', 'SUPABASE');
-  END IF;
-  v_hasil := public.kmb_monitoring()::jsonb;
-  IF lower(coalesce(v_auth->>'role', 'mechanic')) = 'mechanic' AND (v_hasil #> '{result,mechanics}') IS NOT NULL THEN
-    v_hasil := jsonb_set(v_hasil, '{result,mechanics}', '[]'::jsonb);
-  END IF;
-  RETURN v_hasil::json;
-END;
-$$;
+-- kmb_monitoring_bertoken: definisinya pindah ke db/bersama/monitoring_bertoken.sql (gerbang peran seperti GAS, 14 Nov 2026).
 
 -- 1d. Daftar WO Mekanik (`kmb_my_wos` & `kmb_my_wos_bertoken`, Case-Insensitive pada ID & Nama)
 CREATE OR REPLACE FUNCTION public.kmb_my_wos(p_mechanic_id text)
@@ -1931,7 +1912,6 @@ GRANT EXECUTE ON FUNCTION public.kmb_wos_by_status(text) TO service_role;
 
 GRANT EXECUTE ON FUNCTION public.kmb_ping(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_create_refs_bertoken(text) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.kmb_monitoring_bertoken(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_my_wos_bertoken(text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_wos_by_status_bertoken(text, text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.kmb_monitoring_daftar_bertoken(text, text) TO anon, authenticated, service_role;

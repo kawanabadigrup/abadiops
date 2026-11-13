@@ -1113,21 +1113,8 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.kmbtra_monitoring_bertoken(p_token text)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF btrim(coalesce(p_token, '')) = '' THEN
-    RETURN json_build_object('success', false, 'error', 'Token tidak dikenal / nonaktif', 'source', 'SUPABASE');
-  END IF;
-  RETURN public.kmbtra_monitoring();
-END;
-$$;
+-- kmbtra_monitoring_bertoken: definisinya pindah ke db/bersama/monitoring_bertoken.sql (gerbang peran seperti GAS, 14 Nov 2026).
 
-GRANT EXECUTE ON FUNCTION public.kmbtra_monitoring_bertoken(text) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.sum_monitoring()
 RETURNS json
@@ -1282,21 +1269,8 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.sum_monitoring_bertoken(p_token text)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-BEGIN
-  IF btrim(coalesce(p_token, '')) = '' THEN
-    RETURN json_build_object('success', false, 'error', 'Token tidak dikenal / nonaktif', 'source', 'SUPABASE');
-  END IF;
-  RETURN public.sum_monitoring();
-END;
-$$;
+-- sum_monitoring_bertoken: definisinya pindah ke db/bersama/monitoring_bertoken.sql (gerbang peran seperti GAS, 14 Nov 2026).
 
-GRANT EXECUTE ON FUNCTION public.sum_monitoring_bertoken(text) TO anon, authenticated, service_role;
 
 
 -- Segarkan cache skema PostgREST agar seluruh fungsi RPC baru langsung aktif tanpa delay 404 PGRST202

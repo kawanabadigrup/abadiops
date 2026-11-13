@@ -12,6 +12,29 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: monitoring tidak lagi membocorkan token, butir 6)
+- Berubah:
+  - **Aturan GAS yang ditiru**, dibaca langsung dari kode GAS (`MAR-SUM-v2`, `MAR-project`, `MAR-PROJEK-KMB`):
+    - SUM V2, `pull_monitoring`: daftar-izin, hanya `supervisor` dan `superintendent`. Peran lain, termasuk peran kosong, ditolak dengan "Monitoring hanya untuk L1 dan L2.";
+    - KMB V2 dan KMB Project, `getMonitoringData`: mekanik mendapat daftar kosong. Peran lain hanya melihat mekanik dalam lingkup section-nya; lingkup kosong berarti semua (HO).
+  - **`db/bersama/monitoring_bertoken.sql`** (baru) menjadi satu-satunya tempat definisi `sum_`, `kmbtra_`, dan `kmb_monitoring_bertoken`, dibangun dari versi yang terpasang di Gedung 2.
+    - Enam definisi lama di lima file diganti penunjuk, supaya menjalankan file lama tidak memunculkan kebocoran lagi.
+    - Fungsi bantu baru `_lingkup_section` dan `_lingkup_section_boleh` meniru `getUserSectionScope` dan `userScopeAllows`.
+  - **Terpasang di Gedung 2, diuji dengan token sungguhan per peran** (lewat REST, kunci publik staging):
+    - SUM sebelum: `foreman` dan `foreman_approver` menerima 41 token mekanik. Sesudah: hanya `supervisor` dan `superintendent`; `foreman`, `foreman_approver`, `mechanic`, dan peran kosong ditolak;
+    - KMB Project sebelum: supervisor section `maintenance` menerima 22 token, termasuk 11 mekanik `vessel`. Sesudah: 11, hanya `maintenance`. Superintendent `maintenance, vessel` tetap 22;
+    - KMB TRA: tetap 35 mekanik, karena semua approver memegang `field` dan `tyreman`;
+    - token karangan ditolak di ketiga rumah, dan jalur aplikasi (`<rumah>_eksekusi_aksi_bertoken`, `pull_monitoring`) ikut tertutup.
+  - Token KMB Project tanpa baris `Config_Mechanics` (di staging: `MECH-KMBP-L1`, `SPV-901`, `SUPT-001`) tetap melihat semua mekanik. Ini sama dengan GAS KMB Project: `_resolveToken` mengambil peran dari ApiTokens dan memakai email buatan tanpa section, sehingga lingkupnya semua.
+  - **Produksi dicek dan aman:**
+    - fungsi monitoring di Gedung 1 masih versi 30 Okt yang tidak mengirim token mekanik;
+    - fungsi lama portal `public.kmb_*` di Gedung 1 galat untuk setiap panggilan sejak `kmb_projek` dipindah ke arsip.
+- Belum selesai / berikutnya:
+  - Monitoring belum 1:1 di luar urusan token: angka ringkasan KMB belum dibatasi lingkup section, akun uji belum disaring (`saringOrangUji`), dan WO arsip belum dihitung. Masuk uji kembar.
+  - Gedung 1 (produksi): `sum_monitoring_bertoken` dan `kmbtra_monitoring_bertoken` masih daftar-tolak, jadi nama dan angka per mekanik (tanpa token) terlihat oleh peran selain `mechanic`. Diperbarui saat staging di-merge ke `main`.
+  - Cabut atau hapus fungsi lama portal `public.kmb_*` di Gedung 1.
+  - Butir serah-terima berikutnya: 5 (buku tamu kiriman).
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: kata ajaib panel dan data rekaan dibuang)
 - Berubah:
   - **`main` digabung ke `staging`** (`09a6581`). Bentrok hanya di PROGRES dan BUG-DICATAT, tanpa baris yang dibuang. Bug #29 milik staging (cache dasbor mekanik SUM) menjadi #30, karena #29 sudah dipakai di `main`.
