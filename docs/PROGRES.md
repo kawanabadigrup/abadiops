@@ -22,7 +22,7 @@ Formatnya:
   - Aturan 6 di `docs/GEDUNG-DAN-STAGING.md` §1.
   - Diuji 13 Nov: `/cek` menjawab Gedung 2 200, dan Gedung 1 530 (masih dijeda). Cron terdaftar di akun (satu-satunya cron).
 - Belum selesai / berikutnya:
-  - Gabriel memulihkan Gedung 1 dari dasbor Supabase. Sesudahnya `/cek` harus 200 untuk kedua gedung.
+  - ~~Gabriel memulihkan Gedung 1 dari dasbor Supabase.~~ **Dipulihkan 13 Nov sore** (Resume project). `/cek` menjawab 200 untuk kedua gedung.
   - Setelah pulih, cermin Gedung 1 perlu disinkron ulang. Isinya tertinggal: token uji 29–30 Okt tidak dikenali.
 
 ---
