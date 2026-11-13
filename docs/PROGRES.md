@@ -12,6 +12,24 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (deploy pintu produksi: #24 dan #26 tayang)
+- Berubah:
+  - Token Cloudflare `abadiops-deploy` dipasang di `C:devahasiaabadiops.env`. Izinnya Workers di akun kawanabadigrup, serta Workers Routes/DNS edit dan Zone read di abadiops.com. Berlaku sampai 11 Feb 2027.
+  - Riwayat deploy Cloudflare:
+    - Worker produksi terakhir di-deploy 30 Okt. Sejak 2 Nov tidak ada deploy produksi.
+    - Pintu staging terakhir di-deploy 12 Nov 13:51 WIB.
+  - Pintu produksi di-deploy dari `main` sebagai versi `6ac7fea8`; versi untuk kembali: `934f12d9`.
+    - Kodenya beda dari yang tayang hanya di #26.
+    - Ikut tayang `a4107da` (login panel menerima `success`).
+  - Diuji di produksi:
+    - tiga token uji masuk lewat pintu, dan tombol Web membuka web GAS (#24 beres di produksi);
+    - `/saklar/api/status` tanpa sesi dijawab 401;
+    - saklar produksi semua `gas`.
+  - Akses akun Raka tetap, atas keputusan Gabriel.
+- Belum selesai / berikutnya: lihat entri serah-terima di bawah.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (serah-terima kerja Raka; audit staging 2–11 Nov)
 - Berubah:
   - Kerja Raka disimpan di repo ini:
@@ -53,7 +71,6 @@ Formatnya:
   - Gabriel:
     - tutup celah Gedung 2 dengan SQL dari Claude;
     - pulihkan Gedung 1 di dasbor Supabase;
-    - cabut akses Raka di Cloudflare, Supabase, dan GitHub;
     - isi `C:\dev\rahasia\abadiops.env`.
   - Claude:
     - deploy pintu (`ba2732d`) begitu token ada;
