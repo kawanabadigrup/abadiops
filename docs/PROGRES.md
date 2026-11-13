@@ -26,8 +26,8 @@ Formatnya:
     - rahasia Actions `GOOGLE_SA_KEY_JSON`, `CERMIN_DATABASE_URL`, dan `CERMIN_RUMAH` diisi dari `abadiops.env` lewat API GitHub. Tokennya fine-grained `abadiops-cermin`: hanya repo abadiops, izin Actions dan Secrets, berlaku sampai 11 Feb 2027;
     - rumah baru cukup ditambah satu baris di `CERMIN_RUMAH`, tanpa mengubah kode;
     - log dibuat ringkas karena repo publik, dan ID spreadsheet disamarkan.
+  - **Putaran pertama di GitHub** (dijalankan manual, selesai 13 Nov ±23:51 WIB) lulus dalam ±10 menit: 87 sheet lulus, 0 gagal, dan hanya 24 baris KMB TRA yang ditulis. `sinkron_terakhir` keempat skema di Gedung 1 ikut diperbarui; ukuran tetap 245 MB.
 - Belum selesai / berikutnya:
-  - Putaran pertama di GitHub dijalankan setelah push ini. Hasilnya dicatat di entri berikutnya.
   - Hitungan "7 hari tanpa selisih" dimulai dari putaran terjadwal pertama yang lulus.
   - Pemeriksaan selisih harian perlu dibuat tanpa menarik seluruh isi tabel, karena batas egress paket gratis 5 GB per bulan. Caranya: simpan sidik yang bisa dihitung di sisi database.
 
