@@ -15,7 +15,7 @@
  *   --sheet=WorkOrders   hanya menyinkronkan satu sheet
  *   --kering             baca dan hitung saja, tanpa menulis ke database
  *
- * Status: BELUM PERNAH DIJALANKAN. Jalankan pertama kali dengan --kering.
+ * Status: uji kering lulus 13 Nov 2026 (19 dari 19 sheet). Belum pernah menulis ke database.
  */
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -89,10 +89,23 @@ async function aksesToken(keyFile) {
   return { token: (await res.json()).access_token, email: k.client_email };
 }
 
+// Kuota Sheets API: 60 permintaan baca per menit per akun layanan. Beri jeda antarpermintaan,
+// dan kalau tetap kena 429 atau galat 5xx, tunggu lalu coba lagi.
+const JEDA_MS = 1100;
+let terakhirMs = 0;
+const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function gapi(url, token) {
-  const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`${res.status} ${url.split('?')[0]}: ${(await res.text()).slice(0, 300)}`);
-  return res.json();
+  for (let coba = 1; ; coba++) {
+    await tidur(terakhirMs + JEDA_MS - Date.now());
+    terakhirMs = Date.now();
+    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    if (res.ok) return res.json();
+    const pesan = `${res.status} ${url.split('?')[0]}: ${(await res.text()).replace(/\s+/g, ' ').slice(0, 300)}`;
+    if ((res.status !== 429 && res.status < 500) || coba >= 5) throw new Error(pesan);
+    console.log(`  ${res.status}, mencoba lagi (${coba + 1}/5)`);
+    await tidur(res.status === 429 ? 61000 : 5000 * coba);
+  }
 }
 
 // ── Tanggal: nomor seri spreadsheet → ISO UTC, memakai zona waktu spreadsheet ─

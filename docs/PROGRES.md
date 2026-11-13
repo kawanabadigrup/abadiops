@@ -12,6 +12,34 @@ Formatnya:
 
 ---
 
+### 2026-11-13 · Gabriel (+ Claude) · bersama (rahasia lokal lengkap; uji kering cermin empat spreadsheet)
+- Berubah:
+  - **Rahasia lokal lengkap** (`abadiops.env`, di luar repo):
+    - kunci akun layanan Google yang baru;
+    - ID spreadsheet keempat rumah dengan pola `<KODE>_SPREADSHEET_ID`, termasuk baris baru `KMBBUPR_SPREADSHEET_ID`;
+    - token uji KMB Project.
+  - Akun layanan bisa membaca keempat spreadsheet: SUM V2, KMB V2, Projek KMB, dan New MAR Project (BUPR). Masing-masing dibagikan sebagai Viewer dari akun Google pemiliknya.
+  - **Kuota Sheets API (bug #28):** ketiga alat sinkron sekarang memberi jeda 1,1 detik antarpermintaan, dan mencoba ulang kalau kena 429 atau 5xx. Sebelumnya, putaran pertama SUM berhenti di sheet ke-14, lalu semua sheet sesudahnya ikut gagal.
+  - **Uji kering** (`--kering`, tanpa koneksi database). Tidak ada satu pun 429:
+    - SUM V2: 19 dari 19 sheet cocok. WorkOrders 380, WorkOrders_Archive 16.702, MechanicPoints 36.075, AuditLogs 72.551.
+    - KMB V2: 16 dari 24 sheet tersalin. WorkOrders 813, WorkOrders_Archive 14.088, MechanicPoints 42.341, AuditLogs 73.893.
+    - Projek KMB: 12 dari 24 sheet tersalin. WorkOrders 129, WorkOrders_Archive 1.121.
+    - New MAR Project (BUPR), diuji dengan alat kmb_projek: 12 dari 24 sheet tersalin. WorkOrders 3, WorkOrders_Archive 11.
+  - **Temuan:** alat cermin keluarga KMB tidak cocok dengan spreadsheet aslinya (bug #29 baru). Ketiga spreadsheet keluarga KMB punya 24 sheet yang sama.
+  - **Perkiraan ukuran** (dari Gedung 2 dan jumlah baris hari ini):
+    - cermin penuh keempat rumah ±400 MB, sedangkan batas Gedung 1 di paket gratis 500 MB;
+    - AuditLogs saja ±120 MB;
+    - data SUM bertambah ±10% dalam dua minggu terakhir.
+- Belum selesai / berikutnya:
+  - Sebelum menulis ke Gedung 1, Gabriel perlu memutuskan:
+    - ukuran: AuditLogs ikut dicermin atau tidak, atau naik ke paket Pro;
+    - tabel lama `kmb_projek` di Gedung 1 (salinan 27 Okt yang tidak dipakai kode produksi) diganti format cermin.
+  - Perbaiki alat cermin KMB (bug #29), lalu uji kering lagi.
+  - Sinkron terjadwal belum ada. Hitungan syarat "cermin 7 hari" baru mulai setelah sinkron terjadwal berjalan.
+  - Drive API di proyek Google akun layanan belum aktif, karena konsol Google Cloud mewajibkan Verifikasi 2 Langkah sejak 29 Mei 2026. Selama belum aktif, ID spreadsheet rumah baru diambil dari URL yang dikirim Gabriel.
+
+---
+
 ### 2026-11-13 · Gabriel (+ Claude) · bersama (Gedung 2: isi diperiksa, celah admin ditutup)
 - Berubah:
   - `DATABASE_URL_GEDUNG2` terisi, setelah sandi database Gedung 2 di-reset. Nama proyek Supabase-nya "Stagging".
