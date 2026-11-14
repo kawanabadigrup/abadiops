@@ -11,5 +11,9 @@
 | `awalan_token` | Awalan token baru yang diterbitkan panel |
 | `section` | Daftar `[kode, label]` section, kosong bila kamar tanpa section. Cerminan konstanta GAS kamar itu |
 | `peran` | Daftar `[kode, label]` peran. Cerminan konstanta GAS kamar itu |
+| `gas.script` | ID script GAS kamar. Dipakai `tools/kembar/bundel-gas.mjs` untuk membungkus kode GAS asli ke Worker kamar |
+| `gas.versi` | Versi GAS yang dipatok untuk Worker. Mengganti versi: ubah di sini, bungkus ulang, uji kembar, lalu deploy |
+| `gas.aksi_worker` | Aksi API yang dijawab Worker dengan kode GAS asli di atas cermin (bila saklar mengizinkan). Aksi lain diteruskan ke GAS |
+| `gas.sheet_tidak_dimuat` | Sheet cermin yang tidak dikirim ke Worker (besar dan tidak dipakai aksi baca). Aksi yang membacanya ditolak |
 
 Kamar yang **aktif** di tiap lingkungan diatur `RUMAH` di `workers/pintu/wrangler.toml` (bagian produksi dan `env.staging`). Menambah kamar: tambah profilnya di sini, lalu satu baris `RUMAH` di lingkungan yang dituju.

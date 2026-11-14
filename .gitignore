@@ -41,3 +41,7 @@ gas-backup/
 
 # Sisa wrangler dev lokal (jangan di-commit)
 .wrangler/
+
+# Kode GAS asli yang dibungkus untuk Worker rumah (tools/kembar/bundel-gas.mjs). Repo ini publik:
+# kode bisnis rumah tidak ikut ke GitHub, dan dibuat ulang dari versi yang dipatok di config/rumah.json.
+workers/*/gas/

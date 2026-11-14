@@ -57,6 +57,12 @@
       ["mechanic", "Mekanik"],
       ["supervisor", "Supervisor / Planner (L1)"],
       ["superintendent", "Superintendent / Manager (L2)"]
-    ]
+    ],
+    "gas": {
+      "script": "1EMxIxcP1NMqLyjaaFOMbldYBGDdF_mb0OCLjbd3In0PymjTAoUR2XLiM",
+      "versi": 9,
+      "aksi_worker": ["ping", "pull_my_wos", "pull_create_refs", "pull_pending", "pull_active", "pull_approved", "pull_rejected", "pull_transfers", "pull_monitoring", "pull_tyre_form", "debug_raw_wos"],
+      "sheet_tidak_dimuat": ["ProcessedOps"]
+    }
   }
 }

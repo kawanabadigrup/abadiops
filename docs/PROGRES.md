@@ -12,6 +12,33 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (langkah 2 BUPR: GAS asli di Worker; celah list_tokens ditutup)
+- Berubah:
+  - **Celah `list_tokens` ditutup di produksi** (bug #32). Aksi itu mengirim semua token utuh ke pemegang token mana pun di KMB Project dan BUPR. Blok 4 barisnya dibuang dan di-deploy dari editor: KMB Project @48, BUPR @9. Sebelumnya dipastikan versi produksi (@47, @8) identik dengan HEAD, jadi versi baru hanya berisi tambalan itu.
+  - **Fungsi KMB Project di Gedung 2 tidak dipakai untuk BUPR** (KEPUTUSAN 14 Nov, bug #34): dibangun di atas skema karangan dan tidak 1:1 dengan GAS.
+  - **GAS asli di Worker** (KEPUTUSAN 14 Nov). Logika bisnis tidak ditulis ulang; kode GAS BUPR yang asli dijalankan di Worker dengan sheet diganti cermin Supabase.
+    - `workers/bersama/gas-layanan.js`: `SpreadsheetApp`, `Utilities`, `CacheService`, `LockService`, dan lainnya ditiru, termasuk `Date` berzona skrip, karena Worker selalu UTC. Diuji terhadap `Date` Node berzona Asia/Jakarta: 52.754 pembandingan, 0 beda.
+    - `db/bersama/cermin_baca.sql`: isi cermin per sheet untuk satu kamar. Terpasang di Gedung 2, hanya `service_role` yang boleh memanggil.
+    - `tools/kembar/gas-lokal.mjs`: pembanding uji kembar. Kode GAS dijalankan di komputer kerja tanpa menyentuh Google. `tools/kembar/bundel-gas.mjs`: membungkus versi GAS yang dipatok di `config/rumah.json` (`kmbbupr.gas`, sekarang @9) untuk Worker. Bundelnya tidak di-commit.
+    - `workers/kmbbupr`: Worker BUPR. Aksi di `gas.aksi_worker` dijawab kode GAS asli; aksi lain diteruskan ke GAS. Gagal tertutup bila GAS membaca sheet yang tidak dimuat atau mencoba menulis.
+  - **Tayang di staging:** `abadiops-kmbbupr-staging` (baru), membaca cermin `kmbbupr` di Gedung 2.
+  - **Uji:**
+    - 12 aksi baca BUPR berjalan di GAS lokal untuk 6 orang tanpa satu pun tulisan;
+    - mode ketat vs longgar: 66 dari 66 sama;
+    - lingkungan Worker (ketat, `Date` berzona, mesin UTC, ProcessedOps tidak dimuat) vs awal: 60 dari 60 sama;
+    - bundel vs GAS lokal: 60 dari 60 sama;
+    - **Worker staging vs GAS lokal: 66 dari 66 sama** (11 aksi × 6 orang, termasuk `pull_tyre_form` dengan WO sungguhan);
+    - token karangan dijawab GAS persis; aksi tulis dan `list_tokens` ditolak tanpa dijalankan;
+    - membaca cermin rata-rata 156 ms per panggilan.
+  - Temuan lain di staging: Worker KMB Project mencoba fungsi KMB TRA bila fungsi `kmb_*` gagal (bug #33).
+- Belum selesai / berikutnya:
+  - Jalur tulis BUPR dengan kode GAS yang sama: `SpreadsheetApp` yang menulis ke Supabase dengan kunci (Durable Object) dan dedup `op_id`.
+  - `kmbbupr` ke `RUMAH` pintu staging (panel saklar), dan PWA BUPR (langkah 4) diarahkan ke Worker staging.
+  - Cermin `kmbbupr` di Gedung 2 masih salinan sekali (14 Nov 01.28 WIB).
+  - Uji kembar Worker di atas cermin Gedung 1 (sinkron tiap jam) melawan GAS produksi, sebelum ada aksi BUPR yang dipindah di produksi.
+  - Cara yang sama untuk KMB Project, KMB TRA, dan SUM: bundel GAS masing-masing, lalu uji kembar.
+  - Penerbitan ulang token L1/L2 KMB Project setelah celah #32: keputusan Gabriel.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama (staging: daftar kamar dari konfigurasi, langkah 1 rencana BUPR)
 - Berubah:
   - **Langkah 1a** (`bd6e173`): `config/rumah.json` menjadi satu-satunya profil kamar (nama, skema, awalan fungsi, awalan token, section, peran) untuk keempat kamar, termasuk `kmbbupr`. Kamar yang aktif per lingkungan tetap diatur `RUMAH` di `wrangler.toml`.
