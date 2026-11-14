@@ -94,24 +94,21 @@ async function tanganiApi(request, env, url) {
   const tulisDiWorker = (p.gas.aksi_tulis_worker || []).includes(aksi) && bolehTulis(saklar, env);
 
   if (tulisDiWorker) {
-    // Sheet jarang (gas.sheet_jarang_tulis, misalnya ProcessedOps → op_id): hanya baris milik op_id kiriman ini.
-    const opId = String(isi.op_id || '');
-    const jarang = Object.fromEntries(Object.entries(p.gas.sheet_jarang_tulis || {}).map(([sheet, kolom]) => [sheet, { kolom, nilai: opId }]));
-    const h = await jalankanDanSimpan(env, p, url, { jarang }, (G) => {
+    const h = await jalankanDanSimpan(env, p, url, `tulis:${aksi}`, { jarang: sheetJarang(p, String(isi.op_id || '')) }, (G) => {
       const keluar = G.doPost(buatPermintaanPost(teks));
       return keluar && keluar.getContent ? keluar.getContent() : '';
     });
-    const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Tulis': h.ringkas || '-', 'X-Abadi-Coba': String(h.coba || 0) };
+    const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Tulis': h.ringkas || '-', 'X-Abadi-Coba': String(h.coba || 0), 'X-Abadi-Muat': h.muat || '-' };
     if (h.ok) return jawab(h.nilai, 'gas-worker-tulis', env, info);
     if (h.ramai) return jawab(JAWABAN_RAMAI, 'gas-worker-ramai', env, info);
     return jawab({ success: false, error: `Aksi ${aksi} tidak bisa disimpan ke Supabase: ${h.alasan}` }, 'gas-worker-ditolak', env, info);
   }
   if (diWorker) {
-    const h = await jalankanBaca(env, p, url, (G) => {
+    const h = await jalankanBaca(env, p, url, `api:${aksi}`, (G) => {
       const keluar = G.doPost(buatPermintaanPost(teks));
       return keluar && keluar.getContent ? keluar.getContent() : '';
     });
-    const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Ms': `cermin=${h.msCermin};gas=${h.msGas}` };
+    const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Ms': `cermin=${h.msCermin};gas=${h.msGas}`, 'X-Abadi-Muat': h.muat || '-' };
     if (h.ok) return jawab(h.nilai, 'gas-worker', env, info);
     // Gagal tertutup: jawaban yang mungkin salah tidak pernah dikirim.
     return jawab({ success: false, error: `Aksi ${aksi} tidak bisa dijawab dari Supabase: ${h.alasan}` }, 'gas-worker-ditolak', env, info);
@@ -128,7 +125,7 @@ async function tanganiWeb(request, env, url) {
   const p = profil(env);
   const saklar = await bacaStatusSaklar(env);
   if (!bolehTulis(saklar, env)) return Response.redirect(String(env.GAS_URL) + url.search, 302);
-  const h = await jalankanDanSimpan(env, p, url, {}, (G) => {
+  const h = await jalankanDanSimpan(env, p, url, `web:${url.searchParams.get('page') || ''}`, { jarang: sheetJarang(p, '') }, (G) => {
     const k = G.doGet(buatPermintaanGet(url.search));
     if (!k || typeof k.getContent !== 'function') throw new Error('doGet tidak mengembalikan halaman');
     return { isi: k.getContent(), judul: k.getTitle(), meta: k.getMetaTags(), favicon: k.getFaviconUrl() };
@@ -172,7 +169,7 @@ async function tanganiRun(request, env, url) {
   const kirim = (o, tulis) => jawab(o, 'gas-worker-web', env, { 'X-Abadi-Tulis': tulis || '-' });
   if (!INFO_GAS.fungsiWeb.includes(fn)) return kirim({ ok: false, error: `Script function not found: ${fn}` });
   if (!bolehTulis(saklar, env)) return kirim({ ok: false, error: 'MAR Web rumah ini masih dilayani GAS.' });
-  const h = await jalankanDanSimpan(env, p, url, {}, (G) => {
+  const h = await jalankanDanSimpan(env, p, url, `run:${fn}`, { jarang: sheetJarang(p, '') }, (G) => {
     const f = G.fungsiWeb[fn];
     if (typeof f !== 'function') throw new Error(`Script function not found: ${fn}`);
     return hasilRun(f.apply(null, args));
@@ -183,6 +180,14 @@ async function tanganiRun(request, env, url) {
 }
 
 // ── Menjalankan GAS ────────────────────────────────────────────────────────
+// Sheet jarang untuk pekerjaan yang menulis (gas.sheet_jarang_tulis): "<sheet>": "<kolom>" memuat baris yang kolomnya
+// sama dengan op_id kiriman ini (ProcessedOps); "<sheet>": { kolom, nilai } memuat baris dengan nilai tetap itu,
+// misalnya nilai yang tidak pernah ada untuk AuditLogs: hanya jumlah barisnya yang dimuat, cukup untuk menambah baris.
+function sheetJarang(p, opId) {
+  return Object.fromEntries(Object.entries(p.gas.sheet_jarang_tulis || {})
+    .map(([sheet, k]) => [sheet, typeof k === 'string' ? { kolom: k, nilai: opId } : { kolom: k.kolom, nilai: k.nilai }]));
+}
+
 function siapkanGas(cermin, url) {
   const D = dataDariCermin(cermin, INFO_GAS.zonaSkrip);
   D.html = HTML_GAS;
@@ -191,59 +196,110 @@ function siapkanGas(cermin, url) {
   return { L, G: gasKamar(L) };
 }
 
-// Aksi baca: tanpa penyimpanan. Gagal tertutup bila GAS membaca sheet yang tidak dimuat atau menulis.
-async function jalankanBaca(env, p, url, kerja) {
+// ── Memuat sheet sesuai kebutuhan ──────────────────────────────────────────
+// Worker tidak memuat seluruh cermin (KMB V2 ±18 MB, SUM ±20 MB per permintaan: CPU Worker dan egress Supabase,
+// BUG-DICATAT #40). Untuk setiap jenis pekerjaan (kunci: aksi API, halaman web, fungsi google.script.run) disimpan
+// daftar sheet yang ternyata dibaca kode GAS, mulai dari gas.sheet_dasar. Sheet lain dikirim sebagai "tidak_dimuat":
+// tetap dikenal kode GAS, tetapi membacanya tercatat (CATAT.baca_dilewati) dan hasilnya dibuang. Sheet itu lalu
+// ditambahkan ke daftar dan pekerjaan diulang, sebelum apa pun disimpan. Hasil akhirnya selalu sama dengan memuat
+// seluruh cermin; sesudah pekerjaan pertama di sebuah isolate, biasanya cukup sekali baca.
+// Sheet jarang (gas.sheet_jarang_tulis) yang ternyata dibaca di luar baris yang dimuat (CATAT.tidak_aman) dipelajari
+// juga: untuk kunci itu dimuat utuh.
+const ULANG_MUAT = 10;
+const PERLU = new Map();   // kunci → Set sheet yang dimuat utuh
+const PENUH = new Map();   // kunci → Set sheet jarang yang harus dimuat utuh
+let DAFTAR_SHEET = { skema: '', daftar: null, sampai: 0 };
+
+// Nama semua sheet cermin rumah ini (dari cermin_baca semua_sheet), disimpan 5 menit per isolate. null bila
+// gedungnya belum punya cermin_baca dengan p_hanya: Worker lalu memuat seluruh cermin seperti dulu.
+async function semuaSheet(env, skema) {
+  const t = Date.now();
+  if (DAFTAR_SHEET.skema === skema && DAFTAR_SHEET.sampai > t) return DAFTAR_SHEET.daftar;
+  const c = await bacaCermin(env, skema, { hanya: [] });
+  DAFTAR_SHEET = { skema, daftar: Array.isArray(c.semua_sheet) ? c.semua_sheet : null, sampai: t + 5 * 60 * 1000 };
+  return DAFTAR_SHEET.daftar;
+}
+
+function himpunan(peta, kunci, awal = []) {
+  if (!peta.has(kunci)) peta.set(kunci, new Set(awal));
+  return peta.get(kunci);
+}
+
+// Sheet yang namanya disebut pesan CATAT.tidak_aman ("<sheet>.<cara> mengenai…", "<sheet> dibaca di…").
+function sheetTidakAman(pesan) {
+  return [...new Set(pesan.map((m) => String(m).split(/[ .]/)[0]).filter(Boolean))];
+}
+
+// Satu putaran: muat cermin sesuai daftar, siapkan GAS, jalankan kerja. Kembalikan { L, cermin, nilai } atau
+// { belajar: true } bila sheet baru harus dimuat dulu.
+async function putaran(env, p, url, kunci, { jarang = {}, tanpaMuat = [] }, kerja) {
+  const semua = await semuaSheet(env, p.skema);
+  const perlu = himpunan(PERLU, kunci, p.gas.sheet_dasar || []);
+  const penuh = himpunan(PENUH, kunci);
+  const jarangKini = Object.fromEntries(Object.entries(jarang).filter(([s]) => !penuh.has(s)));
+  const tidakDimuat = semua
+    ? semua.filter((n) => tanpaMuat.includes(n) || (!perlu.has(n) && !penuh.has(n) && !(n in jarangKini)))
+    : tanpaMuat.slice();
   const t0 = Date.now();
-  let cermin;
-  try {
-    cermin = await bacaCermin(env, p.skema, p.gas.sheet_tidak_dimuat || []);
-  } catch (e) {
-    return { ok: false, alasan: `cermin tidak terbaca (${e.message})`, msCermin: Date.now() - t0, msGas: 0 };
-  }
+  const cermin = await bacaCermin(env, p.skema, { tidakDimuat, jarang: jarangKini });
   const t1 = Date.now();
-  try {
-    const { L, G } = siapkanGas(cermin, url);
-    const nilai = kerja(G, L);
-    const C = L.__CATAT;
-    const ms = { msCermin: t1 - t0, msGas: Date.now() - t1 };
-    if (C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${C.baca_dilewati.join(', ')})`, ...ms };
-    if (C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${C.tidak_aman.join('; ')})`, ...ms };
-    if (C.tulis.length) return { ok: false, alasan: 'aksi baca ini menulis; tulisan hanya disimpan lewat aksi_tulis_worker', ...ms };
-    return { ok: true, nilai, ...ms };
-  } catch (e) {
-    return { ok: false, alasan: `galat GAS di Worker (${e && e.message})`, msCermin: t1 - t0, msGas: Date.now() - t1 };
+  const { L, G } = siapkanGas(cermin, url);
+  let nilai;
+  try { nilai = { nilai: kerja(G, L) }; } catch (e) { nilai = { galat: String((e && e.message) || e) }; }
+  const C = L.__CATAT;
+  const baru = C.baca_dilewati.filter((n) => !tanpaMuat.includes(n) && !perlu.has(n));
+  if (baru.length && semua) { baru.forEach((n) => perlu.add(n)); return { belajar: true }; }
+  const jarangTerbaca = sheetTidakAman(C.tidak_aman).filter((n) => n in jarangKini);
+  if (jarangTerbaca.length) { jarangTerbaca.forEach((n) => penuh.add(n)); return { belajar: true }; }
+  const muat = `sheet=${semua ? semua.length - tidakDimuat.length : 'semua'}`;
+  return { L, cermin, nilai, C, muat, msCermin: t1 - t0, msGas: Date.now() - t1 };
+}
+
+// Aksi baca: tanpa penyimpanan. Gagal tertutup bila GAS membaca sheet yang tidak boleh dimuat
+// (gas.sheet_tidak_dimuat) atau menulis.
+async function jalankanBaca(env, p, url, kunci, kerja) {
+  for (let ulang = 1; ulang <= ULANG_MUAT; ulang++) {
+    let h;
+    try {
+      h = await putaran(env, p, url, kunci, { tanpaMuat: p.gas.sheet_tidak_dimuat || [] }, kerja);
+    } catch (e) {
+      return { ok: false, alasan: `cermin tidak terbaca atau GAS gagal disiapkan (${e && e.message})`, msCermin: 0, msGas: 0 };
+    }
+    if (h.belajar) continue;
+    const ms = { msCermin: h.msCermin, msGas: h.msGas, muat: `${h.muat};ulang=${ulang}` };
+    if (h.C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${h.C.baca_dilewati.join(', ')})`, ...ms };
+    if (h.C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${h.C.tidak_aman.join('; ')})`, ...ms };
+    if (h.C.tulis.length) return { ok: false, alasan: 'aksi baca ini menulis; tulisan hanya disimpan lewat aksi_tulis_worker', ...ms };
+    if (h.nilai.galat !== undefined) return { ok: false, alasan: `galat GAS di Worker (${h.nilai.galat})`, ...ms };
+    return { ok: true, nilai: h.nilai.nilai, ...ms };
   }
+  return { ok: false, alasan: 'terlalu banyak sheet yang harus dipelajari untuk aksi ini', msCermin: 0, msGas: 0 };
 }
 
 // Jalankan kode GAS, lalu simpan tulisannya dalam satu transaksi (public.cermin_tulis). Konkurensi optimistis:
 // bila sheet yang ditulis berubah sejak dibaca, baca ulang dan jalankan ulang, paling banyak COBA_TULIS kali.
 // Seperti di GAS (Sheets tidak transaksional), tulisan tetap disimpan walaupun fungsi kemudian melempar galat;
 // galatnya dikembalikan di nilai.galat. Hasil hanya dikirim bila tulisannya benar-benar tersimpan.
-async function jalankanDanSimpan(env, p, url, { jarang = {} }, kerja) {
-  for (let coba = 1; coba <= COBA_TULIS; coba++) {
-    let cermin;
+async function jalankanDanSimpan(env, p, url, kunci, { jarang = {} }, kerja) {
+  let konflik = 0;
+  for (let ulang = 1; ulang <= ULANG_MUAT + COBA_TULIS; ulang++) {
+    let h;
     try {
-      cermin = await bacaCermin(env, p.skema, [], jarang);
+      h = await putaran(env, p, url, kunci, { jarang }, kerja);
     } catch (e) {
-      return { ok: false, alasan: `cermin tidak terbaca (${e.message})`, coba };
+      return { ok: false, alasan: `cermin tidak terbaca atau GAS gagal disiapkan (${e && e.message})`, coba: ulang };
     }
-    let L, G, nilai;
-    try {
-      ({ L, G } = siapkanGas(cermin, url));
-    } catch (e) {
-      return { ok: false, alasan: `galat GAS di Worker (${e && e.message})`, coba };
-    }
-    try { nilai = { nilai: kerja(G, L) }; } catch (e) { nilai = { galat: String((e && e.message) || e) }; }
-    const C = L.__CATAT;
-    if (C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${C.baca_dilewati.join(', ')})`, coba };
-    if (C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${C.tidak_aman.join('; ')})`, coba };
-    const ekspor = L.__ekspor();
-    if (!Object.keys(ekspor).length) return { ok: true, nilai: perlu(nilai), ringkas: 'tanpa-tulisan', coba };
+    if (h.belajar) continue;
+    const C = h.C;
+    if (C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${C.baca_dilewati.join(', ')})`, coba: ulang };
+    if (C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${C.tidak_aman.join('; ')})`, coba: ulang };
+    const ekspor = h.L.__ekspor();
+    if (!Object.keys(ekspor).length) return { ok: true, nilai: perlu(h.nilai), ringkas: 'tanpa-tulisan', coba: ulang, muat: h.muat };
     let perubahan;
     try {
-      perubahan = susunPerubahan(cermin, ekspor);
+      perubahan = susunPerubahan(h.cermin, ekspor);
     } catch (e) {
-      return { ok: false, alasan: e.message, coba };
+      return { ok: false, alasan: e.message, coba: ulang };
     }
     const ringkas = Object.entries(perubahan).map(([s, x]) => `${s}:${x.tulis.length}`).join(',');
     const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cermin_tulis`, {
@@ -255,16 +311,17 @@ async function jalankanDanSimpan(env, p, url, { jarang = {} }, kerja) {
       },
       body: JSON.stringify({ p_skema: p.skema, p_perubahan: perubahan }),
     });
-    if (r.ok) return { ok: true, nilai: perlu(nilai), ringkas, coba };
+    if (r.ok) return { ok: true, nilai: perlu(h.nilai), ringkas, coba: ulang, muat: h.muat };
     const galat = await r.text();
-    if (!/KONFLIK/.test(galat)) return { ok: false, alasan: `penyimpanan gagal (HTTP ${r.status}: ${galat.slice(0, 160)})`, ringkas, coba };
+    if (!/KONFLIK/.test(galat)) return { ok: false, alasan: `penyimpanan gagal (HTTP ${r.status}: ${galat.slice(0, 160)})`, ringkas, coba: ulang };
+    if (++konflik >= COBA_TULIS) return { ok: false, ramai: true, coba: ulang };
   }
-  return { ok: false, ramai: true, coba: COBA_TULIS };
+  return { ok: false, alasan: 'terlalu banyak sheet yang harus dipelajari untuk pekerjaan ini', coba: ULANG_MUAT + COBA_TULIS };
 }
 // Jalur API mengembalikan teks jawaban GAS apa adanya; jalur web mengembalikan {nilai} atau {galat}.
 function perlu(n) { return n && Object.prototype.hasOwnProperty.call(n, 'nilai') && typeof n.nilai === 'string' ? n.nilai : n; }
 
-async function bacaCermin(env, skema, tidakDimuat, jarang = {}) {
+async function bacaCermin(env, skema, { tidakDimuat = [], jarang = {}, hanya } = {}) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum diisi');
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cermin_baca`, {
     method: 'POST',
@@ -273,7 +330,7 @@ async function bacaCermin(env, skema, tidakDimuat, jarang = {}) {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ p_skema: skema, p_tidak_dimuat: tidakDimuat, p_jarang: jarang }),
+    body: JSON.stringify({ p_skema: skema, p_tidak_dimuat: tidakDimuat, p_jarang: jarang, ...(hanya ? { p_hanya: hanya } : {}) }),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
   return r.json();
