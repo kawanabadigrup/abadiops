@@ -19,3 +19,6 @@ Kode GAS diambil dengan `clasp clone <scriptId> [versi]` ke folder **di luar rep
 - **Mode ketat.** Worker selalu ketat; GAS longgar. Uji `--ketat` dengan membandingkan jawaban kedua mode (BUPR: 66 dari 66 sama).
 - **Zona waktu.** `Date` tiruan membawa zona skrip (`appsscript.json` `timeZone`), karena Worker selalu UTC. Diuji terhadap `Date` Node berzona Asia/Jakarta: 52.754 pembandingan, 0 beda.
 - **Aksi baca yang menulis atau membaca sheet besar** tercatat di `catatan.tulis` dan `catatan.baca_dilewati`; Worker menolak menjawabnya.
+- **Mode sesi** (`siapkanGasLokal({ sesi: true })`): tulisan setiap panggilan diterapkan ke data di memori (tidak pernah ke database), jadi urutan aksi seperti buat WO → kirim kerja → approve bisa dijalankan dan isi akhirnya dibandingkan dengan Supabase sesudah Worker menulis.
+- **Properti objek sheet** harus diisi di konstruktor `Lembar`: Proxy pencatat metode menjawab properti yang belum ada dengan fungsi, bukan `undefined`.
+- **op_id uji harus unik per jalankan.** op_id yang sama dengan jalankan sebelumnya dijawab dari ProcessedOps tanpa menulis (dedup GAS bekerja).

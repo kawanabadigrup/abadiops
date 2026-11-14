@@ -12,6 +12,28 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (jalur tulis BUPR: GAS asli di Worker menulis ke Supabase)
+- Berubah:
+  - **Jalur tulis BUPR di Worker staging.** Buat WO, kirim kerja, approve L1/L2, override, tolak, kembalikan, batal, dan transfer dijalankan kode GAS BUPR @9 yang asli. Tulisannya disimpan ke cermin `kmbbupr` Gedung 2 dalam satu transaksi.
+    - `db/bersama/cermin_tulis.sql` (baru): menyimpan baris yang berubah. Konkurensi optimistis menggantikan LockService: versi `sinkron_at` per sheet; bila sheet sudah diubah penulis lain, tidak ada yang disimpan dan galat `KONFLIK` (SQLSTATE `PT409`, HTTP 409) dikembalikan.
+    - `cermin_baca` mengirim versi per sheet dan bisa memuat sheet **jarang** (`p_jarang`): ProcessedOps untuk aksi tulis hanya baris milik `op_id` kiriman itu, sehingga isi cermin per aksi tulis turun dari 2,2 MB ke 245 KB.
+    - `workers/bersama/gas-layanan.js`: `getLastRow`/`getLastColumn` seperti Sheets (baris dan kolom terakhir yang berisi), `__ekspor()` (isi baru sheet yang ditulis, tipe kolom dihitung ulang), dan sheet jarang (bacaan atas baris yang tidak dimuat dicatat `tidak_aman`, lalu ditolak). `gas-simpan.js` (baru) menyusun baris yang berubah.
+    - Worker: tulis hanya bila saklar `supabase` atau lingkungan tanpa GAS (`?uji=supabase` tidak berlaku untuk tulis). Konflik diulang sampai 3 kali, lalu dijawab "Sistem sedang ramai", sama dengan GAS, sehingga PWA mengantre ulang.
+    - `config/rumah.json` `kmbbupr.gas`: `aksi_tulis_worker` dan `sheet_jarang_tulis`; `sheet_tidak_dimuat` (untuk baca) sekarang ProcessedOps dan AuditLogs.
+    - `AuditLogs` BUPR (43 baris) ikut dicermin ke Gedung 2, karena `appendRow` GAS membaca seluruh sheet untuk cek `id` kembar.
+  - **Uji:**
+    - skenario 13 langkah dijalankan di Worker staging dan di GAS lokal sesi (memori) dari data awal yang sama: buat WO, kirim kerja, approve L1/L2, WO mandiri langsung L2 dengan jejak `lewati_mandiri`, kiriman ulang `op_id`, penolakan (mandiri dengan orang lain, mekanik biasa, tanpa `op_id`), dan pembatalan. **Jawaban 13 dari 13 identik, dan isi akhir ke-24 sheet identik**; yang disamarkan hanya stempel waktu, ID dari jam, dan akhiran acak nomor WO;
+    - tabrakan: 2 dan 4 kiriman bersamaan tersimpan semua (sebagian pada percobaan ke-2 atau ke-3) atau dijawab "ramai". Kiriman yang sama 3 kali bersamaan dijalankan tepat sekali (1 baris ProcessedOps, 1 audit, jawaban ketiganya sama);
+    - baca tetap 66 dari 66 identik; rata-rata membaca cermin 102 ms.
+  - **Pelajaran:** konflik jangan memakai SQLSTATE 40001. Pustaka transaksi PostgREST mengulang sendiri transaksi dengan kode itu dengan data lama yang sama, sehingga permintaan yang kalah menggantung sekitar 126 detik sampai gerbang Supabase menjawab 504.
+  - Data staging BUPR dikembalikan ke isi spreadsheet sesudah uji (`sinkron.mjs --skema=kmbbupr --lewati=`); tidak ada data uji yang tersisa.
+  - Temuan: GAS BUPR menganggap beberapa WO dengan job berbeda untuk unit dan tim yang sama sebagai satu WO (bug #35, perlu keputusan Gabriel).
+- Belum selesai / berikutnya:
+  - Pemicu terjadwal GAS (pemangkas ProcessedOps dan KirimanWeb, penjaga) lewat cron Worker; notifikasi push dari jalur tulis.
+  - AuditLogs besar (KMB Project, SUM) tidak bisa dimuat utuh di setiap aksi tulis; butuh cara lain sebelum rumah itu.
+  - `kmbbupr` ke `RUMAH` pintu staging dan PWA BUPR diarahkan ke Worker staging, supaya bisa dicoba dari HP.
+  - Saklar produksi BUPR: mematikan sinkron spreadsheet → Gedung 1 untuk BUPR, uji kembar di atas Gedung 1, lalu keputusan Gabriel (titik henti).
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (langkah 2 BUPR: GAS asli di Worker; celah list_tokens ditutup)
 - Berubah:
   - **Celah `list_tokens` ditutup di produksi** (bug #32). Aksi itu mengirim semua token utuh ke pemegang token mana pun di KMB Project dan BUPR. Blok 4 barisnya dibuang dan di-deploy dari editor: KMB Project @48, BUPR @9. Sebelumnya dipastikan versi produksi (@47, @8) identik dengan HEAD, jadi versi baru hanya berisi tambalan itu.

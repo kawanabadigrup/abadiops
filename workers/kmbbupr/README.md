@@ -35,19 +35,37 @@ Mengganti versi GAS: ubah `kmbbupr.gas.versi` di `config/rumah.json`, buat ulang
 
 ## Gagal tertutup
 
-Worker tidak pernah mengirim jawaban yang mungkin salah. Aksi di `aksi_worker` dijawab dengan galat bila kode GAS:
+Worker tidak pernah mengirim jawaban yang mungkin salah. Aksinya dijawab dengan galat bila kode GAS:
 
-- membaca sheet yang tidak dimuat (`gas.sheet_tidak_dimuat`, misalnya `ProcessedOps`) atau tidak dicermin (`AuditLogs`);
-- mencoba menulis (jalur tulis belum dipindah);
-- melempar galat di luar `doPost`, atau cermin tidak terbaca.
+- membaca sheet yang tidak dimuat (`gas.sheet_tidak_dimuat` untuk aksi baca, misalnya `ProcessedOps`) atau tidak dicermin;
+- memakai baris sheet jarang yang tidak dimuat (`tidak_aman`);
+- menulis pada aksi baca (tulisan hanya disimpan lewat `aksi_tulis_worker`), atau membuat sheet baru;
+- melempar galat di luar `doPost`, cermin tidak terbaca, atau penyimpanan gagal karena alasan selain konflik.
+
+## Jalur tulis
+
+Aksi di `gas.aksi_tulis_worker` (buat WO, kirim kerja, approve L1/L2, override, tolak, kembalikan, batal, transfer) juga dijalankan kode GAS asli. Tulisannya (`setValues`, `appendRow`, `deleteRow`, …) dikumpulkan di memori, lalu disimpan ke cermin dalam **satu transaksi** lewat `public.cermin_tulis` (`db/bersama/cermin_tulis.sql`, `../bersama/gas-simpan.js`).
+
+- **Hanya bila Supabase sumber datanya:** saklar `supabase`, atau lingkungan tanpa GAS (staging). `?uji=supabase` tidak berlaku untuk tulis, karena cermin yang masih disinkron dari spreadsheet akan tertimpa.
+- **Pengganti LockService: konkurensi optimistis.** Setiap sheet dibaca bersama versinya (`sinkron_at`). Bila sheet yang ditulis sudah diubah penulis lain, tidak ada yang disimpan (`KONFLIK`, HTTP 409); Worker membaca ulang dan menjalankan ulang GAS, paling banyak 3 kali. Sesudah itu PWA mendapat jawaban "Sistem sedang ramai", sama dengan GAS saat kuncinya penuh, dan mengantre ulang.
+- **Dedup `op_id` tetap milik GAS** (ProcessedOps). Untuk aksi tulis, ProcessedOps dimuat **jarang** (`gas.sheet_jarang_tulis`): hanya baris milik `op_id` kiriman ini dan jumlah barisnya, karena GAS hanya mencari op_id itu lalu menambah satu baris. Bacaan lain atas baris yang tidak dimuat ditolak.
+- Jawaban GAS hanya dikirim bila tulisannya benar-benar tersimpan.
+
+Uji 14 Nov 2026 (staging, dari data awal yang sama dengan GAS lokal sesi):
+
+- skenario 13 langkah: buat WO, kirim kerja, approve L1/L2, WO mandiri (langsung L2, jejak `lewati_mandiri`), kiriman ulang `op_id`, penolakan, dan pembatalan. Jawaban 13 dari 13 identik, dan isi akhir ke-24 sheet identik;
+- tabrakan: 2 dan 4 kiriman bersamaan semuanya tersimpan (sebagian pada percobaan ke-2 atau ke-3) atau dijawab "ramai"; kiriman yang sama 3 kali bersamaan dijalankan tepat sekali (1 baris ProcessedOps, 1 audit).
+
+Data staging BUPR dikembalikan ke isi spreadsheet dengan `node tools/cermin/sinkron.mjs --skema=kmbbupr --lewati=` (spreadsheet hanya dibaca).
 
 ## Uji kembar
 
-Pembandingnya `tools/kembar/gas-lokal.mjs`: kode GAS yang sama dijalankan di komputer kerja di atas cermin yang sama, dalam mode ketat dan zona mesin UTC seperti Worker. 14 Nov 2026: 66 dari 66 jawaban Worker staging identik dengan GAS lokal (11 aksi × 6 orang).
+Pembandingnya `tools/kembar/gas-lokal.mjs`: kode GAS yang sama dijalankan di komputer kerja di atas cermin yang sama, dalam mode ketat dan zona mesin UTC seperti Worker. 14 Nov 2026: 66 dari 66 jawaban baca Worker staging identik dengan GAS lokal (11 aksi × 6 orang).
 
 ## Belum
 
-- Jalur tulis (buat WO, kirim kerja, approve, transfer). Kode GAS-nya sudah ikut di bundel; yang belum adalah `SpreadsheetApp` yang menulis ke Supabase dengan kunci dan dedup `op_id`.
-- `get_vapid_key` dan notifikasi push memakai Script Properties dan `UrlFetchApp`, jadi tetap di GAS.
+- Pemicu terjadwal GAS (pemangkas ProcessedOps dan KirimanWeb pukul 02.00, penjaga pukul 06.00 dan 18.00) belum berjalan di sisi Worker. Butuh cron Worker sebelum saklar produksi.
+- `get_vapid_key` dan notifikasi push memakai Script Properties dan `UrlFetchApp`, jadi tetap di GAS. Di jalur tulis Worker, push ke HP approver tidak terkirim.
+- `AuditLogs` dimuat utuh untuk aksi tulis (GAS memeriksa `id` kembar di seluruh sheet). BUPR masih 43 baris; rumah dengan AuditLogs besar butuh cara lain.
 - `kmbbupr` belum ada di `RUMAH` pintu, sehingga panel saklar belum menampilkannya.
 - Cermin `kmbbupr` di Gedung 2 adalah salinan sekali (14 Nov 01.28 WIB), bukan sinkron tiap jam.

@@ -48,8 +48,17 @@ const PASANG = `Object.assign(globalThis, (${buatLayanan.toString()})(JSON.parse
 globalThis.__buatPermintaanPost = ${buatPermintaanPost.toString()};
 globalThis.__panggilApi = function (isiJson) {
   var keluar = doPost(__buatPermintaanPost(isiJson));
-  return JSON.stringify({ isi: keluar && typeof keluar.getContent === 'function' ? keluar.getContent() : null, catatan: __CATAT });
+  return JSON.stringify({ isi: keluar && typeof keluar.getContent === 'function' ? keluar.getContent() : null, catatan: __CATAT, ekspor: __ekspor() });
 };`;
+
+// Terapkan hasil __ekspor() ke data cermin, seperti yang dilakukan penyimpanan Worker (public.cermin_tulis):
+// panggilan berikutnya membaca isi yang baru.
+export function terapkanEkspor(data, ekspor) {
+  for (const [nama, s] of Object.entries(ekspor)) {
+    data.sheets[nama] = { headers: s.headers, rows: s.rows, tanggal: s.headers.map((h) => String(s.tipe[h] || '').includes('tanggal')) };
+  }
+  return data;
+}
 
 // GAS menjalankan berkas berurutan menurut urutan proyek, dan kode tingkat atas boleh memakai variabel dari
 // berkas yang dimuat lebih dulu. Urutan itu tidak ikut di clone (clasp mengurutkan nama), jadi berkas yang
@@ -60,7 +69,7 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
   const skrip = kode.berkas.map((b) => new vm.Script(awalan + b.isi, { filename: b.nama }));
   const pasang = new vm.Script(PASANG, { filename: 'gas-layanan.js' });
   const host = buatHost();
-  const dataJson = JSON.stringify(data);
+  let dataJson = JSON.stringify(data);
   let urutan = null;
   const konteksBaru = () => {
     const ctx = vm.createContext({ __D: dataJson, __host: host });
@@ -85,10 +94,13 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
   return {
     konteksBaru,
     urutan: () => { if (!urutan) konteksBaru(); return urutan.map((i) => kode.berkas[i].nama); },
+    gantiData: (baru) => { dataJson = JSON.stringify(baru); },
   };
 }
 
-export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [] }) {
+// sesi: perubahan setiap panggilan diterapkan ke data di memori (tidak pernah ke database), jadi urutan aksi
+// seperti buat WO → kirim kerja → approve bisa dijalankan berurutan.
+export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [], sesi = false }) {
   // Sama dengan Worker: mesin UTC, zona skrip dibawa Date tiruan.
   process.env.TZ = 'UTC';
   const kode = bacaKodeGas(folderGas);
@@ -98,11 +110,13 @@ export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tid
   return {
     berkas: kode.berkas.length,
     cermin: { sinkron: data.sinkron, sheet: Object.keys(data.sheets).length, dilewati: data.dilewati },
+    data: () => data,
     api(token, action, isi = {}, opId = undefined) {
       const ctx = k.konteksBaru();
       const mulai = Date.now();
       const hasil = JSON.parse(vm.runInContext('__panggilApi', ctx)(JSON.stringify({ token, action, op_id: opId, data: isi })));
-      return { jawaban: hasil.isi === null ? null : JSON.parse(hasil.isi), catatan: hasil.catatan, ms: Date.now() - mulai };
+      if (sesi && Object.keys(hasil.ekspor).length) k.gantiData(terapkanEkspor(data, hasil.ekspor));
+      return { jawaban: hasil.isi === null ? null : JSON.parse(hasil.isi), catatan: hasil.catatan, ekspor: hasil.ekspor, ms: Date.now() - mulai };
     },
   };
 }

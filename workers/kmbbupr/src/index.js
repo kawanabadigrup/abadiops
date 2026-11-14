@@ -12,7 +12,12 @@ import PROFIL_RUMAH from '../../../config/rumah.json';
 import { buatLayanan, buatPermintaanPost, dataDariCermin } from '../../bersama/gas-layanan.js';
 import { buatHost } from '../../bersama/gas-host.js';
 import { bacaStatusSaklar } from '../../bersama/saklar.js';
+import { susunPerubahan } from '../../bersama/gas-simpan.js';
 import { gasKamar, INFO as INFO_GAS } from '../gas/gas-kamar.js';
+
+// Jawaban GAS saat kunci operasi tidak didapat (ApiService.js). PWA menahannya di antrean dan mengirim ulang.
+const JAWABAN_RAMAI = { success: false, retry_later: true, error: 'Sistem sedang ramai — operasi ini tetap di antrean dan akan dikirim ulang otomatis.' };
+const COBA_TULIS = 3;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +68,17 @@ async function tanganiApi(request, env, url) {
   const tanpaGas = !env.GAS_URL || String(env.GAS_URL).trim() === '';
   const diWorker = p.gas.aksi_worker.includes(aksi)
     && (saklar !== 'gas' || tanpaGas || url.searchParams.get('uji') === 'supabase');
+  // Tulis hanya bila Supabase memang sumber datanya. ?uji=supabase sengaja tidak berlaku: tulisan ke cermin yang
+  // masih disinkron dari spreadsheet akan tertimpa, dan kedua sumber berselisih.
+  const tulisDiWorker = (p.gas.aksi_tulis_worker || []).includes(aksi) && (saklar === 'supabase' || tanpaGas);
 
+  if (tulisDiWorker) {
+    const h = await jalankanTulisDiWorker(teks, env, p);
+    const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Tulis': h.ringkas || '-', 'X-Abadi-Coba': String(h.coba || 0) };
+    if (h.ok) return jawab(h.isi, 'gas-worker-tulis', env, info);
+    if (h.ramai) return jawab(JAWABAN_RAMAI, 'gas-worker-ramai', env, info);
+    return jawab({ success: false, error: `Aksi ${aksi} tidak bisa disimpan ke Supabase: ${h.alasan}` }, 'gas-worker-ditolak', env, info);
+  }
   if (diWorker) {
     const h = await jalankanGasDiWorker(teks, env, p);
     const info = { 'X-Abadi-Gas-Versi': String(INFO_GAS.versi), 'X-Abadi-Ms': `cermin=${h.msCermin};gas=${h.msGas}` };
@@ -90,14 +105,66 @@ async function jalankanGasDiWorker(teks, env, p) {
     const C = L.__CATAT;
     const ms = { msCermin: t1 - t0, msGas: Date.now() - t1 };
     if (C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${C.baca_dilewati.join(', ')})`, ...ms };
-    if (C.tulis.length) return { ok: false, alasan: 'aksi ini menulis, dan jalur tulis belum dipindah', ...ms };
+    if (C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${C.tidak_aman.join('; ')})`, ...ms };
+    if (C.tulis.length) return { ok: false, alasan: 'aksi baca ini menulis; tulisan hanya disimpan lewat aksi_tulis_worker', ...ms };
     return { ok: true, isi: keluar && keluar.getContent ? keluar.getContent() : '', ...ms };
   } catch (e) {
     return { ok: false, alasan: `galat GAS di Worker (${e && e.message})`, msCermin: t1 - t0, msGas: Date.now() - t1 };
   }
 }
 
-async function bacaCermin(env, skema, tidakDimuat) {
+// Jalankan aksi tulis dengan kode GAS, lalu simpan tulisannya dalam satu transaksi (public.cermin_tulis).
+// Konkurensi optimistis: bila sheet yang ditulis berubah sejak dibaca, baca ulang dan jalankan ulang GAS.
+// Jawaban GAS hanya dikirim bila tulisannya benar-benar tersimpan.
+async function jalankanTulisDiWorker(teks, env, p) {
+  // Sheet jarang (gas.sheet_jarang_tulis, misalnya ProcessedOps → op_id): hanya baris milik op_id kiriman ini.
+  let opId = '';
+  try { opId = String(JSON.parse(teks).op_id || ''); } catch (_) {}
+  const jarang = Object.fromEntries(Object.entries(p.gas.sheet_jarang_tulis || {}).map(([sheet, kolom]) => [sheet, { kolom, nilai: opId }]));
+  for (let coba = 1; coba <= COBA_TULIS; coba++) {
+    let cermin;
+    try {
+      cermin = await bacaCermin(env, p.skema, [], jarang);
+    } catch (e) {
+      return { ok: false, alasan: `cermin tidak terbaca (${e.message})`, coba };
+    }
+    let keluar, L;
+    try {
+      L = buatLayanan(dataDariCermin(cermin, INFO_GAS.zonaSkrip), buatHost());
+      keluar = gasKamar(L).doPost(buatPermintaanPost(teks));
+    } catch (e) {
+      return { ok: false, alasan: `galat GAS di Worker (${e && e.message})`, coba };
+    }
+    const C = L.__CATAT;
+    if (C.baca_dilewati.length) return { ok: false, alasan: `membaca sheet yang tidak dimuat (${C.baca_dilewati.join(', ')})`, coba };
+    if (C.tidak_aman.length) return { ok: false, alasan: `memakai baris yang tidak dimuat (${C.tidak_aman.join('; ')})`, coba };
+    const isi = keluar && keluar.getContent ? keluar.getContent() : '';
+    const ekspor = L.__ekspor();
+    if (!Object.keys(ekspor).length) return { ok: true, isi, ringkas: 'tanpa-tulisan', coba };
+    let perubahan;
+    try {
+      perubahan = susunPerubahan(cermin, ekspor);
+    } catch (e) {
+      return { ok: false, alasan: e.message, coba };
+    }
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cermin_tulis`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_skema: p.skema, p_perubahan: perubahan }),
+    });
+    const ringkas = Object.entries(perubahan).map(([s, x]) => `${s}:${x.tulis.length}`).join(',');
+    if (r.ok) return { ok: true, isi, ringkas, coba };
+    const galat = await r.text();
+    if (!/KONFLIK/.test(galat)) return { ok: false, alasan: `penyimpanan gagal (HTTP ${r.status}: ${galat.slice(0, 160)})`, ringkas, coba };
+  }
+  return { ok: false, ramai: true, coba: COBA_TULIS };
+}
+
+async function bacaCermin(env, skema, tidakDimuat, jarang = {}) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum diisi');
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/cermin_baca`, {
     method: 'POST',
@@ -106,7 +173,7 @@ async function bacaCermin(env, skema, tidakDimuat) {
       Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ p_skema: skema, p_tidak_dimuat: tidakDimuat }),
+    body: JSON.stringify({ p_skema: skema, p_tidak_dimuat: tidakDimuat, p_jarang: jarang }),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
   return r.json();

@@ -29,7 +29,10 @@
  */
 export function buatLayanan(D, host) {
   var NativeDate = Date;
-  var CATAT = { tulis: [], tak_dikenal: [], baca_dilewati: [], dibaca: [], layanan: [], log: [] };
+  // tidak_aman: operasi pada sheet jarang yang tidak bisa dijawab dari baris yang dimuat. Worker menolak.
+  var CATAT = { tulis: [], tak_dikenal: [], baca_dilewati: [], tidak_aman: [], dibaca: [], layanan: [], log: [] };
+  // Penanda baris sheet jarang yang tidak dikirim server (cermin_baca p_jarang).
+  var TIDAK_DIMUAT = { tidakDimuat: true };
   var ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
   var ZONA = D.zonaSkrip;
 
@@ -157,47 +160,76 @@ export function buatLayanan(D, host) {
 
   // ── Sheet dan range ──
   var LEMBAR = {}, DAFTAR = [], SS;
+  // Semua properti dalam diisi di sini: Proxy tanpaDikenal menjawab properti yang belum ada dengan fungsi pencatat.
   function Lembar(nama, v, lebar, dilewati) {
     this._nama = nama; this._v = v; this._lebar = lebar; this._dilewati = !!dilewati; this._id = DAFTAR.length + 1;
+    this._akhir = null; this._berubah = false; this._jarang = null;
   }
+  function adaIsi(x) { return x !== undefined && x !== null && x !== ''; }
   Lembar.prototype = {
     _baca: function () { catatSekali(CATAT.dibaca, this._nama); if (this._dilewati) catatSekali(CATAT.baca_dilewati, this._nama); },
     _tulis: function (cara, baris, kolom, isi) {
       var teks; try { teks = JSON.stringify(isi); } catch (e) { teks = String(isi); }
       CATAT.tulis.push({ sheet: this._nama, cara: cara, baris: baris, kolom: kolom, isi: String(teks).slice(0, 300) });
+      this._berubah = true;
+      this._akhir = null;
     },
     _pastikan: function (baris, kolom) {
       while (this._v.length < baris) this._v.push([]);
       if (kolom > this._lebar) this._lebar = kolom;
+    },
+    // Seperti Sheets: baris dan kolom terakhir yang BERISI, bukan panjang larik. Baris yang dikosongkan di ujung
+    // tidak dihitung, dan appendRow menulis tepat di bawah baris terakhir yang berisi.
+    _ujung: function () {
+      if (!this._akhir) {
+        var nb = this._v.length, nk = 0;
+        while (nb > 0 && this._v[nb - 1] !== TIDAK_DIMUAT && !(this._v[nb - 1] || []).some(adaIsi)) nb--;
+        for (var i = 0; i < nb; i++) {
+          var r = this._v[i];
+          if (r === TIDAK_DIMUAT) continue;
+          r = r || [];
+          for (var j = r.length; j > nk; j--) if (adaIsi(r[j - 1])) { nk = j; break; }
+        }
+        this._akhir = { b: nb, k: nk };
+      }
+      return this._akhir;
+    },
+    // Sheet jarang: baris yang tidak dimuat tidak boleh digeser atau ditimpa.
+    _jagaJarang: function (cara, dari, sampai) {
+      if (!this._jarang) return;
+      for (var i = dari; i <= sampai && i <= this._v.length; i++) {
+        if (this._v[i - 1] === TIDAK_DIMUAT) { catatSekali(CATAT.tidak_aman, this._nama + '.' + cara + ' mengenai baris yang tidak dimuat'); return; }
+      }
     },
     getName: function () { return this._nama; },
     getSheetName: function () { return this._nama; },
     getSheetId: function () { return this._id; },
     getIndex: function () { return this._id; },
     getParent: function () { return SS; },
-    getLastRow: function () { this._baca(); return this._v.length; },
-    getLastColumn: function () { this._baca(); return this._v.length ? this._lebar : 0; },
+    getLastRow: function () { this._baca(); return this._ujung().b; },
+    getLastColumn: function () { this._baca(); return this._ujung().k; },
     getMaxRows: function () { return Math.max(this._v.length, 1000); },
     getMaxColumns: function () { return Math.max(this._lebar, 26); },
     getFrozenRows: function () { return 1; },
     getFrozenColumns: function () { return 0; },
     isSheetHidden: function () { return false; },
-    getDataRange: function () { return rentang(this, 1, 1, Math.max(this._v.length, 1), Math.max(this._lebar, 1)); },
+    getDataRange: function () { var u = this._ujung(); return rentang(this, 1, 1, Math.max(u.b, 1), Math.max(u.k, 1)); },
     getRange: function (a, b, c, d) {
       if (typeof a === 'string') return rentangA1(this, a);
       return rentang(this, a, b, c === undefined ? 1 : c, d === undefined ? 1 : d);
     },
     appendRow: function (arr) {
-      this._tulis('appendRow', this._v.length + 1, 1, arr);
-      this._v.push(arr.map(salin));
-      if (arr.length > this._lebar) this._lebar = arr.length;
+      var n = this._ujung().b;
+      this._tulis('appendRow', n + 1, 1, arr);
+      this._pastikan(n + 1, arr.length);
+      this._v[n] = arr.map(salin);
       return this;
     },
-    deleteRow: function (n) { this._tulis('deleteRow', n, 1, null); this._v.splice(n - 1, 1); return this; },
-    deleteRows: function (n, k) { this._tulis('deleteRows', n, 1, k); this._v.splice(n - 1, k); return this; },
-    insertRowAfter: function (n) { this._tulis('insertRowAfter', n, 1, null); this._v.splice(n, 0, []); return this; },
-    insertRowsAfter: function (n, k) { this._tulis('insertRowsAfter', n, 1, k); for (var i = 0; i < k; i++) this._v.splice(n, 0, []); return this; },
-    insertRowBefore: function (n) { this._tulis('insertRowBefore', n, 1, null); this._v.splice(n - 1, 0, []); return this; },
+    deleteRow: function (n) { this._jagaJarang('deleteRow', n, this._v.length); this._tulis('deleteRow', n, 1, null); this._v.splice(n - 1, 1); return this; },
+    deleteRows: function (n, k) { this._jagaJarang('deleteRows', n, this._v.length); this._tulis('deleteRows', n, 1, k); this._v.splice(n - 1, k); return this; },
+    insertRowAfter: function (n) { this._jagaJarang('insertRowAfter', n + 1, this._v.length); this._tulis('insertRowAfter', n, 1, null); this._v.splice(n, 0, []); return this; },
+    insertRowsAfter: function (n, k) { this._jagaJarang('insertRowsAfter', n + 1, this._v.length); this._tulis('insertRowsAfter', n, 1, k); for (var i = 0; i < k; i++) this._v.splice(n, 0, []); return this; },
+    insertRowBefore: function (n) { this._jagaJarang('insertRowBefore', n, this._v.length); this._tulis('insertRowBefore', n, 1, null); this._v.splice(n - 1, 0, []); return this; },
     insertColumnAfter: function (n) { this._tulis('insertColumnAfter', 1, n, null); this._lebar++; return this; },
     setFrozenRows: function (n) { this._tulis('setFrozenRows', 1, 1, n); return this; },
     // Pencarian teks satu sheet atau range: cukup untuk cara kode GAS ini memakainya (cari sel yang sama persis).
@@ -209,7 +241,9 @@ export function buatLayanan(D, host) {
       this._l._baca();
       var out = [];
       for (var i = 0; i < this._nb; i++) {
-        var r = this._l._v[this._b - 1 + i] || [];
+        var r = this._l._v[this._b - 1 + i];
+        if (r === TIDAK_DIMUAT) { catatSekali(CATAT.tidak_aman, this._l._nama + ' dibaca di baris yang tidak dimuat'); r = []; }
+        r = r || [];
         var baris = [];
         for (var j = 0; j < this._nk; j++) baris.push(salin(r[this._k - 1 + j]));
         out.push(baris);
@@ -224,6 +258,7 @@ export function buatLayanan(D, host) {
     },
     getDisplayValue: function () { return this.getDisplayValues()[0][0]; },
     setValues: function (m) {
+      this._l._jagaJarang('setValues', this._b, this._b + m.length - 1);
       this._l._tulis('setValues', this._b, this._k, m);
       this._l._pastikan(this._b + m.length - 1, this._k + ((m[0] || []).length) - 1);
       for (var i = 0; i < m.length; i++) {
@@ -251,19 +286,36 @@ export function buatLayanan(D, host) {
     createTextFinder: function (teks) { return pencari(this._l, this._b, this._k, this._nb, this._nk, teks); },
   };
   function pencari(l, b, k, nb, nk, teks) {
-    var opsi = { utuh: false, hurufSama: false };
+    var opsi = { utuh: false, hurufSama: false, regex: false };
     var f = tanpaDikenal('TextFinder', {
       matchEntireCell: function (x) { opsi.utuh = !!x; return f; },
       matchCase: function (x) { opsi.hurufSama = !!x; return f; },
+      useRegularExpression: function (x) { opsi.regex = !!x; return f; },
       findAll: function () {
         l._baca();
-        var cari = opsi.hurufSama ? String(teks) : String(teks).toLowerCase(), hasil = [];
+        var cocok;
+        if (opsi.regex) {
+          var re = new RegExp(opsi.utuh ? '^(?:' + String(teks) + ')$' : String(teks), opsi.hurufSama ? '' : 'i');
+          cocok = function (s) { return re.test(s); };
+        } else {
+          var cari = opsi.hurufSama ? String(teks) : String(teks).toLowerCase();
+          cocok = function (s) { s = opsi.hurufSama ? s : s.toLowerCase(); return opsi.utuh ? s === cari : s.indexOf(cari) !== -1; };
+        }
+        // Sheet jarang: baris yang tidak dimuat boleh dilewati HANYA bila pencariannya persis saringan server
+        // (kolom yang sama, nilai yang sama, cocok utuh dan peka huruf): server sudah mengirim semua baris yang cocok.
+        var bolehLewati = !!l._jarang && !opsi.regex && opsi.utuh && opsi.hurufSama && nk === 1
+          && k - 1 === l._jarang.kolom && String(teks) === l._jarang.nilai;
+        var hasil = [];
         for (var i = 0; i < nb; i++) {
-          var r = l._v[b - 1 + i] || [];
+          var r = l._v[b - 1 + i];
+          if (r === TIDAK_DIMUAT) {
+            if (!bolehLewati) catatSekali(CATAT.tidak_aman, l._nama + ' dicari di baris yang tidak dimuat');
+            continue;
+          }
+          r = r || [];
           for (var j = 0; j < nk; j++) {
-            var x = r[k - 1 + j]; if (x === undefined || x === null || x === '') continue;
-            var s = opsi.hurufSama ? String(x) : String(x).toLowerCase();
-            if (opsi.utuh ? s === cari : s.indexOf(cari) !== -1) hasil.push(rentang(l, b + i, k + j, 1, 1));
+            var x = r[k - 1 + j]; if (!adaIsi(x)) continue;
+            if (cocok(String(x))) hasil.push(rentang(l, b + i, k + j, 1, 1));
           }
         }
         return hasil;
@@ -283,7 +335,8 @@ export function buatLayanan(D, host) {
     var sel = t.split(':').map(function (s) { var m = s.match(/^([A-Z]*)(\d*)$/); return { k: m[1] ? angkaKolom(m[1]) : null, b: m[2] ? parseInt(m[2], 10) : null }; });
     var awal = sel[0], akhir = sel[1] || sel[0];
     var b1 = awal.b || 1, k1 = awal.k || 1;
-    var b2 = akhir.b || Math.max(l._v.length, 1), k2 = akhir.k || Math.max(l._lebar, 1);
+    var u = l._ujung();
+    var b2 = akhir.b || Math.max(u.b, 1), k2 = akhir.k || Math.max(u.k, 1);
     return rentang(l, b1, k1, b2 - b1 + 1, k2 - k1 + 1);
   }
   function pasangLembar(nama, v, lebar, dilewati) {
@@ -292,17 +345,27 @@ export function buatLayanan(D, host) {
     return l;
   }
 
+  function barisDariCermin(s, r) {
+    var baris = [];
+    for (var j = 0; j < s.headers.length; j++) {
+      var x = r[j];
+      baris.push(s.tanggal[j] && typeof x === 'string' && ISO.test(x) ? new DateZona(x) : (x === undefined || x === null ? '' : x));
+    }
+    return baris;
+  }
   Object.keys(D.sheets).forEach(function (nama) {
     var s = D.sheets[nama];
     if (s.tidak_dimuat) { pasangLembar(nama, [], 0, true); return; }
-    var v = s.headers.length ? [s.headers.slice()].concat(s.rows.map(function (r) {
-      var baris = [];
-      for (var j = 0; j < s.headers.length; j++) {
-        var x = r[j];
-        baris.push(s.tanggal[j] && typeof x === 'string' && ISO.test(x) ? new DateZona(x) : (x === undefined || x === null ? '' : x));
-      }
-      return baris;
-    })) : [];
+    if (s.jarang) {
+      var vj = [s.headers.slice()];
+      for (var n = 0; n < s.jumlah_baris; n++) vj.push(TIDAK_DIMUAT);
+      s.baris_dimuat.forEach(function (x) { vj[x.baris - 1] = barisDariCermin(s, x.nilai); });
+      var lj = pasangLembar(nama, vj, s.headers.length, false);
+      // lastIndexOf: pada nama kolom kembar, data->>kolom di server berisi kolom yang terakhir.
+      lj._jarang = { kolom: s.headers.lastIndexOf(s.jarang.kolom), nilai: String(s.jarang.nilai) };
+      return;
+    }
+    var v = s.headers.length ? [s.headers.slice()].concat(s.rows.map(function (r) { return barisDariCermin(s, r); })) : [];
     pasangLembar(nama, v, s.headers.length, false);
   });
   (D.dilewati || []).forEach(function (nama) { if (!LEMBAR[nama]) pasangLembar(nama, [], 0, true); });
@@ -417,8 +480,71 @@ export function buatLayanan(D, host) {
   };
   var Logger = { log: function () { catatLog(arguments); return Logger; }, getLog: function () { return CATAT.log.join('\n'); }, clear: function () {} };
 
+  // Isi baru setiap sheet yang ditulis, dalam bentuk cermin (tools/cermin/sinkron.mjs): header, baris nilai
+  // (Date → ISO), dan tipe per kolom dihitung dari baris data. Baris dan kolom kosong di ujung dipotong,
+  // sama dengan getDataRange(). Sheet yang dibuat insertSheet ditandai baru.
+  function jenisSel(x) { return x instanceof NativeDate ? 'tanggal' : typeof x === 'number' ? 'angka' : typeof x === 'boolean' ? 'boolean' : 'teks'; }
+  function teksTipe(set) {
+    var t = Object.keys(set).sort();
+    return t.length === 0 ? 'kosong' : t.length === 1 ? t[0] : 'campur:' + t.join('+');
+  }
+  function ekspor() {
+    var hasil = {};
+    DAFTAR.forEach(function (l) {
+      if (!l._berubah) return;
+      var u = l._ujung(), headers = [], rows = [], tipeKolom = [];
+      var sel = function (i, j) {
+        var x = (l._v[i] || [])[j];
+        if (x instanceof NativeDate) { var t = NativeDate.prototype.getTime.call(x); return isNaN(t) ? '' : new NativeDate(t).toISOString(); }
+        return x === undefined || x === null ? '' : x;
+      };
+      // Sheet jarang: hanya baris yang dimuat atau baru yang bisa dibandingkan. Tipe kolom digabung dengan tipe
+      // lama dari cermin, karena baris lain tidak terlihat.
+      if (l._jarang) {
+        var asal = D.sheets[l._nama], lama = {}, tipeSet = {};
+        asal.baris_dimuat.forEach(function (x) { lama[x.baris] = JSON.stringify(x.nilai); });
+        asal.headers.forEach(function (h) {
+          tipeSet[h] = {};
+          String((asal.tipe || {})[h] || 'kosong').replace(/^campur:/, '').split('+').forEach(function (x) { if (x && x !== 'kosong') tipeSet[h][x] = true; });
+        });
+        if (u.k > asal.headers.length) catatSekali(CATAT.tidak_aman, l._nama + ' mendapat kolom baru pada sheet jarang');
+        var berubah = [];
+        for (var bi = 1; bi < u.b; bi++) {
+          if (l._v[bi] === TIDAK_DIMUAT) continue;
+          var rj = [];
+          for (var kj = 0; kj < asal.headers.length; kj++) rj.push(sel(bi, kj));
+          if (lama[bi + 1] === JSON.stringify(rj)) continue;
+          for (var kt = 0; kt < asal.headers.length; kt++) {
+            var asliJ = (l._v[bi] || [])[kt];
+            if (adaIsi(asliJ)) tipeSet[asal.headers[kt]][jenisSel(asliJ)] = true;
+          }
+          berubah.push({ baris: bi + 1, nilai: rj });
+        }
+        var tipeJ = {};
+        asal.headers.forEach(function (h) { tipeJ[h] = teksTipe(tipeSet[h]); });
+        hasil[l._nama] = { jarang: true, headers: asal.headers.slice(), tipe: tipeJ, jumlah_baris: u.b - 1, baris_berubah: berubah, baru: false };
+        return;
+      }
+      for (var j = 0; j < u.k; j++) { headers.push(u.b ? String(sel(0, j)) : ''); tipeKolom.push({}); }
+      for (var i = 1; i < u.b; i++) {
+        var r = [];
+        for (var k = 0; k < u.k; k++) {
+          var asli = (l._v[i] || [])[k], x = sel(i, k);
+          if (adaIsi(asli)) tipeKolom[k][jenisSel(asli)] = true;
+          r.push(x);
+        }
+        rows.push(r);
+      }
+      var tipe = {};
+      headers.forEach(function (h, k) { tipe[h] = teksTipe(tipeKolom[k]); });
+      hasil[l._nama] = { headers: headers, rows: rows, tipe: tipe, baru: !D.sheets[l._nama] };
+    });
+    return hasil;
+  }
+
   return {
     __CATAT: CATAT,
+    __ekspor: ekspor,
     Date: DateZona,
     SpreadsheetApp: tanpaDikenal('SpreadsheetApp', {
       getActiveSpreadsheet: function () { return SS; },
