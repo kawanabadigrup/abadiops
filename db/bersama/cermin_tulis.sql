@@ -13,6 +13,47 @@
 --   jumlah_baris  jumlah baris data sesudah ditulis; baris di bawahnya dihapus (deleteRow menggeser naik)
 --
 -- Hanya service_role yang boleh memanggil.
+--
+-- KUNCI TULIS (docs/SAKLAR.md, 14 Nov): skema uji_* (ruang uji) selalu boleh ditulis. Skema cermin asli hanya
+-- boleh ditulis setelah tombol "Mulai migrasi" rumah itu membuka izin di public.cermin_izin_tulis. Sebelum itu
+-- GAS satu-satunya penulis, dan cermin asli harus tetap sama persis dengan spreadsheet. Tanpa izin, galat
+-- 'TERKUNCI:' (SQLSTATE PT423, dijawab PostgREST sebagai HTTP 423). Kunci ini di database, bukan hanya di kode,
+-- supaya salah konfigurasi Worker pun tidak bisa menyentuh cermin asli.
+
+CREATE TABLE IF NOT EXISTS public.cermin_izin_tulis (
+  skema       text PRIMARY KEY,
+  boleh       boolean NOT NULL DEFAULT false,
+  alasan      text,
+  diubah_oleh text,
+  diubah_at   timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.cermin_izin_tulis ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.cermin_izin_tulis FROM PUBLIC, anon, authenticated;
+
+-- Dipanggil tombol mulai migrasi (boleh = true) dan tombol "Kembali ke GAS" (boleh = false) di panel saklar.
+CREATE OR REPLACE FUNCTION public.cermin_atur_izin_tulis(p_skema text, p_boleh boolean, p_alasan text, p_oleh text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF p_skema IS NULL OR left(p_skema, 4) = 'uji_' OR to_regclass(format('%I.cermin_header', p_skema)) IS NULL THEN
+    RAISE EXCEPTION 'skema % bukan cermin asli', p_skema USING ERRCODE = '22023';
+  END IF;
+  IF coalesce(btrim(p_alasan), '') = '' OR coalesce(btrim(p_oleh), '') = '' THEN
+    RAISE EXCEPTION 'alasan dan pelaku wajib diisi' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO public.cermin_izin_tulis AS i (skema, boleh, alasan, diubah_oleh, diubah_at)
+  VALUES (p_skema, p_boleh, p_alasan, p_oleh, now())
+  ON CONFLICT (skema) DO UPDATE SET boleh = EXCLUDED.boleh, alasan = EXCLUDED.alasan,
+    diubah_oleh = EXCLUDED.diubah_oleh, diubah_at = EXCLUDED.diubah_at;
+  RETURN jsonb_build_object('skema', p_skema, 'boleh', p_boleh);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.cermin_atur_izin_tulis(text, boolean, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cermin_atur_izin_tulis(text, boolean, text, text) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.cermin_tulis(p_skema text, p_perubahan jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -30,6 +71,11 @@ DECLARE
 BEGIN
   IF p_skema IS NULL OR to_regclass(format('%I.cermin_header', p_skema)) IS NULL THEN
     RAISE EXCEPTION 'skema % bukan cermin', p_skema USING ERRCODE = '22023';
+  END IF;
+  IF left(p_skema, 4) <> 'uji_' AND NOT coalesce(
+       (SELECT i.boleh FROM public.cermin_izin_tulis i WHERE i.skema = p_skema), false) THEN
+    RAISE EXCEPTION 'TERKUNCI: cermin % belum boleh ditulis jalur Supabase (saklar rumah itu belum supabase)', p_skema
+      USING ERRCODE = 'PT423';
   END IF;
 
   -- Kunci dan periksa dulu semua sheet, berurutan nama, supaya dua penulis tidak saling menunggu silang.

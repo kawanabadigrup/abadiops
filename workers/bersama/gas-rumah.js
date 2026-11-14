@@ -59,7 +59,9 @@ async function layani(request, env) {
 function profil(env) {
   const p = PROFIL_RUMAH[env.RUMAH];
   if (!p || !p.gas) throw new Error(`profil rumah ${env.RUMAH} tanpa bagian gas di config/rumah.json`);
-  return p;
+  // Ruang uji (docs/SAKLAR.md): Worker uji memakai SKEMA_AWALAN = "uji_", jadi membaca dan menulis uji_<skema> di
+  // Gedung 1. Objek profil bersama tidak diubah; salinan dangkal per panggilan. Tanpa SKEMA_AWALAN: skema asli.
+  return env.SKEMA_AWALAN ? { ...p, skema: String(env.SKEMA_AWALAN) + p.skema } : p;
 }
 
 const tanpaGas = (env) => !env.GAS_URL || String(env.GAS_URL).trim() === '';

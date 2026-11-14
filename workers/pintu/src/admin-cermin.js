@@ -51,7 +51,12 @@ function profil(env, kode) {
   if (!daftarRumah(env).some((r) => String(r.kode).toLowerCase() === k)) throw new Galat(`Rumah "${k}" tidak ada di daftar RUMAH pintu ini.`);
   const p = PROFIL_RUMAH[k];
   if (!p || !p.skema || !p.admin) throw new Galat(`Profil admin rumah ${k} belum ada di config/rumah.json.`);
-  return { kode: k, ...p, kolom: { ...KOLOM_BAWAAN, ...(p.admin.kolom || {}) } };
+  return { kode: k, ...p, skema: skemaDb(env, p.skema), kolom: { ...KOLOM_BAWAAN, ...(p.admin.kolom || {}) } };
+}
+
+// Ruang uji (docs/SAKLAR.md): pintu uji memakai SKEMA_AWALAN = "uji_" sehingga pusat admin bekerja di uji_<skema>.
+function skemaDb(env, skema) {
+  return (env.SKEMA_AWALAN ? String(env.SKEMA_AWALAN) : '') + skema;
 }
 
 async function rpc(env, nama, body) {
@@ -311,7 +316,7 @@ async function semuaToken(env) {
     const p = PROFIL_RUMAH[String(r.kode).toLowerCase()];
     if (!p || !p.skema || !p.admin) continue;
     let c;
-    try { c = await rpc(env, 'cermin_baca', { p_skema: p.skema, p_hanya: [p.admin.sheet_token] }); } catch (_) { continue; }
+    try { c = await rpc(env, 'cermin_baca', { p_skema: skemaDb(env, p.skema), p_hanya: [p.admin.sheet_token] }); } catch (_) { continue; }
     const s = c.sheets && c.sheets[p.admin.sheet_token];
     if (!s || !s.headers) continue;
     const j = s.headers.findIndex((h) => String(h).trim() === ((p.admin.kolom || {}).token || KOLOM_BAWAAN.token));
