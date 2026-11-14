@@ -1,24 +1,35 @@
 # Rumah KMB V2: Worker `abadiops-kmb`
 
-Rumah: `kmb` · Pemegang: Gabriel · Tahap 3 (Pintu) · Saklar: `gas`
+Rumah: `kmbtra` · Saklar produksi: `gas` · **GAS asli di Worker** (sejak 14 Nov 2026, langkah (d))
 
-Worker ini membuat KMB V2 bisa dipakai lewat Cloudflare dengan **fungsi lengkap PWA**: masuk, buat WO, kirim kerja, approve L1/L2, transfer, monitoring, dan lainnya.
-Semua pekerjaannya tetap dilakukan **GAS KMB V2**. Worker hanya meneruskan setiap panggilan apa adanya. Belum ada satu pun aksi yang dilayani Supabase.
+Sama dengan BUPR dan KMB Projek: Worker menjalankan kode GAS KMB V2 yang **asli** (versi dipatok di
+`config/rumah.json` `kmbtra.gas`, sekarang @299, sudah berisi penjaga `google.script.run`) di atas cermin Supabase
+(skema `kmb`). Logikanya di `workers/bersama/gas-rumah.js`; `src/index.js` hanya memasang bundel GAS rumah ini.
 
 ```
-HP / laptop ──▶ abadiops-kmb (Worker)
-                 ├─ file PWA      ← pwa/kmb/  (salinan 1:1 mar-offline v91)
-                 └─ POST ./api    ──▶ GAS KMB V2 (/exec) ──▶ spreadsheet KMB V2 (1ehnxDlv…)
+HP / laptop ──▶ abadiops-kmb (Worker, kmbtra.abadiops.com)
+                 ├─ file PWA       ← pwa/kmb/  (salinan 1:1 mar-offline v91, alamat API ./api)
+                 ├─ POST ./api     saklar gas: diteruskan apa adanya ke GAS KMB V2 (/exec)
+                 │                 saklar supabase / staging: kode GAS asli di Worker, data cermin kmb
+                 ├─ GET  /web      saklar gas: diarahkan ke web GAS; selain itu MAR Web asli
+                 └─ POST /web/run  google.script.run, hanya fungsi yang dipanggil halaman
 ```
 
-Halaman web GAS KMB V2 (link kedua, menu lengkap) tetap di alamat GAS sampai dipindah 1:1. Lihat `docs/KEPUTUSAN.md`.
+- **Produksi** (saklar `gas`): perilakunya sama dengan sebelumnya (diteruskan apa adanya; `GAS_TIDAK_TERJANGKAU` 502).
+  Saklar dibaca dari pintu lewat ikatan `PINTU`, cadangannya var `SAKLAR = "gas"`.
+- **Staging** (`abadiops-kmb-staging`, tanpa GAS): aksi baca/tulis GAS dijawab Worker dari cermin `kmb` Gedung 2.
+  Kode backend Raka (`supabase-backend.js`, `web-handler.js`, buku tamu, payroll Excel) dibuang dari branch; ada di
+  riwayat git (terakhir di `e7a3b48`).
+- **Belum siap untuk saklar `supabase` produksi**: data KMB V2 besar (rata-rata 6,75 MB per aksi baca sesudah
+  pemuatan sesuai kebutuhan, BUG-DICATAT #41) dan paket gratis Workers memotong CPU di 10 ms (BUG-DICATAT #40).
 
 ## Isi
 
 | File | Isinya |
 |---|---|
-| `workers/kmb/wrangler.toml` | Nama Worker, akun kawanabadigrup (dikunci), folder PWA, alamat GAS KMB V2, saklar `gas` |
-| `workers/kmb/src/index.js` | Menyajikan PWA dan meneruskan `/api` ke GAS. Kodenya sama dengan `workers/sum/src/index.js` |
+| `workers/kmb/wrangler.toml` | Nama Worker, domain, akun kawanabadigrup (dikunci), folder PWA, alamat GAS KMB V2, staging tanpa GAS |
+| `workers/kmb/src/index.js` | Memasang bundel GAS rumah ini ke `workers/bersama/gas-rumah.js` |
+| `workers/kmb/gas/gas-kamar.js` | Bundel GAS asli (TIDAK di repo): `node tools/kembar/bundel-gas.mjs --kamar=kmbtra` |
 | `pwa/kmb/` | PWA KMB V2 v91 apa adanya. Hanya empat baris yang diubah (lihat di bawah) |
 
 ### Yang diubah dari PWA lama (`mar-offline`, repo `mar-kmb-v2-offline`)

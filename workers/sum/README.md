@@ -1,22 +1,34 @@
 # Rumah SUM V2: Worker `abadiops-sum`
 
-Rumah: `sum` · Pemegang: Gabriel · Tahap 3 (Pintu) · Saklar: `gas`
+Rumah: `sum` · Saklar produksi: `gas` · **GAS asli di Worker** (sejak 14 Nov 2026, langkah (d))
 
-Worker ini membuat SUM V2 bisa dipakai lewat Cloudflare dengan **fungsi lengkap**: masuk, buat WO, kirim kerja, approve L1/L2, transfer, cancel, monitoring, dan lainnya.
-Semua pekerjaannya tetap dilakukan **GAS SUM**. Worker hanya meneruskan setiap panggilan apa adanya. Belum ada satu pun aksi yang dilayani Supabase.
+Sama dengan BUPR dan KMB Projek: Worker menjalankan kode GAS SUM V2 yang **asli** (versi dipatok di
+`config/rumah.json` `sum.gas`, sekarang @199, sudah berisi penjaga `google.script.run`) di atas cermin Supabase
+(skema `sum`). Logikanya di `workers/bersama/gas-rumah.js`; `src/index.js` hanya memasang bundel GAS rumah ini.
 
 ```
-HP / laptop ──▶ abadiops-sum (Worker)
-                 ├─ file PWA      ← pwa/sum/  (salinan 1:1 mar-sum-offline v45)
-                 └─ POST ./api    ──▶ GAS SUM (/exec) ──▶ spreadsheet SUM V2
+HP / laptop ──▶ abadiops-sum (Worker, sum.abadiops.com)
+                 ├─ file PWA       ← pwa/sum/  (salinan 1:1 mar-sum-offline v45, alamat API ./api)
+                 ├─ POST ./api     saklar gas: diteruskan apa adanya ke GAS SUM (/exec)
+                 │                 saklar supabase / staging: kode GAS asli di Worker, data cermin sum
+                 ├─ GET  /web      saklar gas: diarahkan ke web GAS; selain itu MAR Web asli
+                 └─ POST /web/run  google.script.run, hanya fungsi yang dipanggil halaman
 ```
+
+- **Produksi** (saklar `gas`): perilakunya sama dengan sebelumnya (diteruskan apa adanya; `GAS_TIDAK_TERJANGKAU` 502).
+  Saklar dibaca dari pintu lewat ikatan `PINTU`, cadangannya var `SAKLAR = "gas"`.
+- **Staging** (`abadiops-sum-staging`, tanpa GAS): aksi baca/tulis GAS dijawab Worker dari cermin `sum` Gedung 2.
+  Kode backend Raka dibuang dari branch; ada di riwayat git (terakhir di `e7a3b48`).
+- **Belum siap untuk saklar `supabase` produksi**: data SUM besar (rata-rata 4,86 MB per aksi baca sesudah pemuatan
+  sesuai kebutuhan, BUG-DICATAT #41) dan paket gratis Workers memotong CPU di 10 ms (BUG-DICATAT #40).
 
 ## Isi
 
 | File | Isinya |
 |---|---|
-| `workers/sum/wrangler.toml` | Nama Worker, folder PWA, alamat GAS SUM, saklar `gas` |
-| `workers/sum/src/index.js` | Menyajikan PWA dan meneruskan `/api` ke GAS. Tidak ada logika bisnis |
+| `workers/sum/wrangler.toml` | Nama Worker, domain, folder PWA, alamat GAS SUM, staging tanpa GAS |
+| `workers/sum/src/index.js` | Memasang bundel GAS rumah ini ke `workers/bersama/gas-rumah.js` |
+| `workers/sum/gas/gas-kamar.js` | Bundel GAS asli (TIDAK di repo): `node tools/kembar/bundel-gas.mjs --kamar=sum` |
 | `pwa/sum/` | PWA SUM v45 apa adanya. Hanya empat baris yang diubah (lihat di bawah) |
 
 ### Yang diubah dari PWA lama

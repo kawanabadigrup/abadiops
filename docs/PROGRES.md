@@ -12,6 +12,17 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbtra, sum, kmbprojek (langkah (d): KMB V2 dan SUM ke GAS asli di staging; muat sheet sesuai kebutuhan)
+- Berubah:
+  - **Worker memuat sheet sesuai kebutuhan** (BUG #41): hanya sheet yang dibaca kode GAS, dipelajari per aksi/halaman/fungsi (gagal tertutup + ulang); AuditLogs jarang untuk tulis. Regresi BUPR identik (baca 66/66, web 36/36, tulis 13/13 + 24 sheet, approve web 4/4 + 24 sheet). Egress rata-rata aksi baca turun 62–76%.
+  - **KMB Projek terbukti setara GAS di semua jalur** (dengan jeda karena batas CPU): baca 44/44, tulis + approve L1/L2 lewat web 4/4 + 24 sheet, halaman MAR Web 27/27.
+  - **KMB V2 (@299) dan SUM (@199) staging pindah ke GAS asli** (`config/rumah.json` `kmbtra.gas`, `sum.gas`; `kmbtra.worker = "kmb"` dibaca pembundel); Worker `workers/kmb`, `workers/sum` memakai modul bersama, backend Raka dibuang (riwayat `e7a3b48`); produksi tetap meneruskan ke GAS (var `SAKLAR = "gas"` + ikatan pintu). GAS tiruan dan pintu staging diarahkan ke Worker baru.
+  - **Uji baca KMB V2/SUM vs GAS lokal:** setiap jawaban yang berhasil identik (KMB V2 40/52, SUM 45/48); yang gagal semuanya batas infrastruktur: batas waktu query Supabase (57014) saat menyusun 10–15 MB `WorkOrders_Archive` per permintaan, dan batas CPU Worker (CPU p90 0,6 s, maks 2 s).
+  - Cermin SUM/KMB TRA staging ternyata masih berisi baris rusak tulisan backend Raka (AuditLogs/ProcessedOps berbentuk salah, baris WorkOrders kosong); disinkron ulang utuh.
+- Belum selesai / berikutnya:
+  - **Cache sheet di Worker + ambil baris yang berubah saja** (`sinkron_at` per baris): syarat untuk KMB V2/SUM (batas waktu query, CPU, egress). Sesudahnya uji ulang tulis, web, dan pusat admin KMB V2/SUM.
+  - Keputusan Gabriel: Workers Paid + Supabase Pro (BUG #40; pengingat tersimpan).
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbprojek, sum, kmbtra (KMB Projek staging ke GAS asli; pusat admin lulus di keempat proyek)
 - Berubah:
   - **KMB Projek staging pindah ke GAS asli di Worker** (keputusan Gabriel): skema Raka `kmb_projek` di Gedung 2 dicadangkan sebagai `kmb_projek_raka_20261114` (18 tabel, tidak dihapus); cermin KMB Projek dibuat dari spreadsheet (24 sheet, termasuk AuditLogs 6.232 baris). `config/rumah.json` `kmbprojek.gas` (@49, aksi sama dengan BUPR: 23 aksi API GAS keduanya identik).

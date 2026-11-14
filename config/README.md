@@ -6,8 +6,10 @@
 |---|---|
 | (nama kunci) | Kode kamar. Sama persis dengan `kode` di `RUMAH` pintu dan `RUMAH` Worker rumahnya |
 | `nama` | Nama kamar |
+| `worker` | Folder Worker rumah di `workers/` bila namanya beda dengan kode kamar (kmbtra → `kmb`). Tanpa kunci ini, foldernya sama dengan kode kamar |
 | `skema` | Skema Supabase tempat cermin dan data kamar |
-| `rpc` | Awalan fungsi database kamar, misalnya `kmb` untuk `kmb_admin_daftar_user_bertoken` |
+| `rpc` | Awalan fungsi database kamar (fungsi ping lama di pintu). Fungsi admin SQL lama sudah dibuang (BUG-DICATAT #39); pusat admin memakai `admin` di bawah |
+| `admin` | Pusat admin di atas cermin (`workers/pintu/src/admin-cermin.js`): `sheet_pengguna`, `sheet_token`, `sheet_config` (pola nama sheet config), `kolom_uang` (`"<sheet>": "*"` atau daftar kolom; perubahannya wajib konfirmasi kedua) |
 | `awalan_token` | Awalan token baru yang diterbitkan panel |
 | `section` | Daftar `[kode, label]` section, kosong bila kamar tanpa section. Cerminan konstanta GAS kamar itu |
 | `peran` | Daftar `[kode, label]` peran. Cerminan konstanta GAS kamar itu |

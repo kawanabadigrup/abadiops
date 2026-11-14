@@ -12,7 +12,9 @@ account_id = "9273ece6d47a3bb103159295c10ce9e6"
 # Nama ikatan RUMAH_<KODE KAMAR> (src/index.js membacanya dari kode kamar).
 services = [
   { binding = "RUMAH_KMBBUPR", service = "abadiops-kmbbupr-staging" },
-  { binding = "RUMAH_KMBPROJEK", service = "abadiops-kmbprojek-staging" }
+  { binding = "RUMAH_KMBPROJEK", service = "abadiops-kmbprojek-staging" },
+  { binding = "RUMAH_KMBTRA", service = "abadiops-kmb-staging" },
+  { binding = "RUMAH_SUM", service = "abadiops-sum-staging" }
 ]
 
 [vars]

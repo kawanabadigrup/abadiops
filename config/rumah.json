@@ -23,10 +23,20 @@
         "Config_Components": ["base_points", "target_hours"],
         "Config_Mechanics": ["golongan"]
       }
+    },
+    "gas": {
+      "script": "1k_A_KERx8GJAamYu8SJ4ef1ddla1B3VYAao8w6XEuGs-P7XvA6uRnGll",
+      "versi": 199,
+      "aksi_worker": ["ping", "pull_my_wos", "pull_create_refs", "pull_pending", "pull_active", "pull_approved", "pull_rejected", "pull_cancelable", "pull_monitoring", "pull_monitoring_daftar", "pull_wo_detail", "debug_raw_wos"],
+      "aksi_tulis_worker": ["submit_work", "create_wo", "approve_l1", "approve_l2", "save_override", "reject", "cancel_wo", "request_transfer", "approve_transfer", "reject_transfer", "report_expired", "reopen_expired"],
+      "sheet_dasar": ["ApiTokens", "Config_Mechanics"],
+      "sheet_tidak_dimuat": ["ProcessedOps", "AuditLogs"],
+      "sheet_jarang_tulis": { "ProcessedOps": "op_id", "AuditLogs": { "kolom": "id", "nilai": "~tidak-ada~" } }
     }
   },
   "kmbtra": {
     "nama": "KMB TRA / V2",
+    "worker": "kmb",
     "skema": "kmb",
     "rpc": "kmbtra",
     "awalan_token": "kmb-",
@@ -52,6 +62,15 @@
         "Config_Jobs_Field": ["base_point", "plan_hours"],
         "Config_Mechanics": ["grade"]
       }
+    },
+    "gas": {
+      "script": "17sBKK-x3qXzL7tRlejsXE1kQXGwF-CQtCoCdhA4ZWE4_E2NSq0ZUwtqo",
+      "versi": 299,
+      "aksi_worker": ["ping", "pull_my_wos", "pull_create_refs", "pull_pending", "pull_active", "pull_approved", "pull_rejected", "pull_transfers", "pull_monitoring", "pull_monitoring_daftar", "pull_tyre_form", "pull_wo_detail", "debug_raw_wos"],
+      "aksi_tulis_worker": ["submit_work", "create_wo", "approve_l1", "approve_l2", "save_override", "reject", "kembalikan_ke_mekanik", "cancel_wo", "request_transfer", "approve_transfer", "reject_transfer", "report_expired", "reopen_expired"],
+      "sheet_dasar": ["ApiTokens", "Config_Mechanics"],
+      "sheet_tidak_dimuat": ["ProcessedOps", "AuditLogs"],
+      "sheet_jarang_tulis": { "ProcessedOps": "op_id", "AuditLogs": { "kolom": "id", "nilai": "~tidak-ada~" } }
     }
   },
   "kmbprojek": {

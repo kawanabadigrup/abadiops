@@ -1,29 +1,31 @@
-# Rumah KMB V2: Worker yang menyajikan PWA KMB V2 dan meneruskan setiap panggilan API ke GAS KMB V2.
-# Rumah: kmb · Pemegang: Gabriel · Tahap 3 (Pintu): 100% diteruskan ke GAS. Saklar: gas.
-# Penjelasan: workers/kmb/README.md
+# Rumah KMB TRA / V2: Worker yang menjalankan kode GAS KMB TRA / V2 yang ASLI di atas cermin Supabase
+# (keputusan Gabriel 14 Nov 2026, "GAS asli di Worker"). Selama saklar "gas", semua aksi diteruskan ke web app GAS.
+# Penjelasan: workers/kmb/README.md.
+#
+# gas/gas-kamar.js TIDAK ada di repo (repo publik). Buat sebelum setiap deploy:
+#   node tools/kembar/bundel-gas.mjs --kamar=kmbtra
+# Script dan versinya dari config/rumah.json kmbtra.gas.
 name = "abadiops-kmb"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+# node:crypto dan node:buffer untuk Utilities.computeDigest dan base64Encode (workers/bersama/gas-host.js).
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# Alamat utama (keputusan Gabriel 28 Okt malam, pilihan A). *.workers.dev dicegat DNS
-# sebagian provider internet, sedangkan domain sendiri tidak. Cloudflare membuat DNS dan
-# sertifikatnya otomatis. workers.dev tetap aktif sementara untuk perangkat uji.
-# Alamat KMB TRA (keputusan Gabriel 28 Okt malam). kmb.abadiops.com (alamat sementara) sudah
-# dilepas sesudah pintu pindah ke Worker abadiops-pintu.
 routes = [
   { pattern = "kmbtra.abadiops.com", custom_domain = true }
 ]
 
-# Akun Cloudflare kawanabadigrup. Dikunci supaya deploy tidak pernah nyasar ke akun lain
-# yang kebetulan sedang login di laptop (misalnya akun pribadi untuk Rembes). Kalau login
-# yang aktif bukan kawanabadigrup, deploy ditolak, tidak dikirim ke akun yang salah.
+# Akun Cloudflare kawanabadigrup. Dikunci supaya deploy tidak pernah nyasar ke akun lain.
 account_id = "9273ece6d47a3bb103159295c10ce9e6"
 
-# File PWA KMB V2 (salinan 1:1 dari mar-offline v91, hanya alamat API yang diganti).
-# html_handling "none": /index.html disajikan langsung (200, tanpa redirect), sama seperti
-# GitHub Pages. Service worker PWA menyimpan ./index.html ke cache dan memakainya saat
-# offline; jawaban hasil redirect tidak boleh dipakai untuk navigasi.
+# Service binding ke Pintu untuk membaca posisi saklar (Bug #27). Tanpa ikatan, saklar = var SAKLAR.
+services = [
+  { binding = "PINTU", service = "abadiops-pintu" }
+]
+
+# File PWA KMB TRA / V2 (salinan 1:1, hanya alamat API yang diganti ./api).
+# html_handling "none": /index.html disajikan langsung (200, tanpa redirect).
 [assets]
 directory = "../../pwa/kmb"
 binding = "ASSETS"
@@ -32,37 +34,28 @@ not_found_handling = "none"
 
 [vars]
 RUMAH = "kmbtra"
+# Cadangan bila pintu tidak terjangkau: tetap GAS.
 SAKLAR = "gas"
-# Web app GAS produksi KMB V2 (script 17sBKK…). Alamat ini juga tertulis di PWA lama.
+# Web app GAS produksi KMB TRA / V2 (script 17sBKK-x3qXzL7tRlejsXE1kQXGwF-CQtCoCdhA4ZWE4_E2NSq0ZUwtqo).
 GAS_URL = "https://script.google.com/macros/s/AKfycbwlwlQvOGVF6FdKkYRNlbgdJCets5L-0AfufMB4_79_HzvoQkeE9aZAqkKZiXCZHXnG6Q/exec"
 SUPABASE_URL = "https://sptgqsjgszwbreikxdph.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_PoWC64yv25bZizBrTL79vw_CuNQwhp3"
-STORAGE_MODE = "GAS"
 
 [observability]
 enabled = true
 
-# Panggung Latihan (Staging) - docs/GEDUNG-DAN-STAGING.md §2
+# Panggung Latihan (Staging) - docs/GEDUNG-DAN-STAGING.md §2. Tanpa GAS: semua aksi di aksi_worker dijawab
+# dari cermin kmb di Gedung 2; aksi lain ditolak. Rahasia: SUPABASE_SERVICE_ROLE_KEY (kunci rahasia
+# Supabase Gedung 2), dipasang dengan `wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env staging`.
 [env.staging]
 name = "abadiops-kmb-staging"
 workers_dev = true
 routes = []
 
 services = [
-  { binding = "GAS_TIRUAN", service = "abadiops-gas-tiruan" },
   { binding = "PINTU", service = "abadiops-pintu-staging" }
-]
-
-# Buku tamu kiriman: ikatan langsung ke SaklarDO milik pintu staging, tanpa rute publik (butir 5 serah-terima 13 Nov).
-[env.staging.durable_objects]
-bindings = [
-  { name = "SAKLAR_DO", class_name = "SaklarDO", script_name = "abadiops-pintu-staging" }
 ]
 
 [env.staging.vars]
 RUMAH = "kmbtra"
-SAKLAR = "supabase"
-GAS_URL = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbtra"
+GAS_URL = ""
 SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O"
-STORAGE_MODE = "SUPABASE"

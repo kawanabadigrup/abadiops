@@ -8,7 +8,7 @@
  *   node tools/kembar/bundel-gas.mjs --kamar=kmbbupr
  * Opsi:
  *   --gas=<folder>     pakai clone yang sudah ada, bukan clone baru (harus versi yang sama dengan rumah.json)
- *   --keluar=<berkas>  bawaan workers/<kamar>/gas/gas-kamar.js
+ *   --keluar=<berkas>  bawaan workers/<folder Worker>/gas/gas-kamar.js (config/rumah.json <kamar>.worker, atau kode kamar)
  *
  * Isi modul:
  *   INFO      kamar, script, versi, jumlah berkas, sidik, zona skrip, dan fungsiWeb.
@@ -67,7 +67,8 @@ const INFO = {
   sidik: sidik.digest('hex'), zonaSkrip: kode.zonaSkrip, dibuat: new Date().toISOString(),
   html: kode.html.length, templat: Object.keys(web.templat).length, fungsiWeb,
 };
-const keluar = arg.keluar || path.join(AKAR, 'workers', arg.kamar, 'gas', 'gas-kamar.js');
+// Folder Worker rumah: config/rumah.json <kamar>.worker bila namanya beda dengan kode kamar (kmbtra → workers/kmb).
+const keluar = arg.keluar || path.join(AKAR, 'workers', profil.worker || arg.kamar, 'gas', 'gas-kamar.js');
 fs.mkdirSync(path.dirname(keluar), { recursive: true });
 const bagian = [
   '// DIBUAT OTOMATIS oleh tools/kembar/bundel-gas.mjs. Jangan disunting, dan jangan di-commit (repo publik).',
