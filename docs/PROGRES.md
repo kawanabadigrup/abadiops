@@ -12,6 +12,23 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (BUPR staging bisa dicoba dari HP)
+- Berubah:
+  - **PWA BUPR** `pwa/kmbbupr`: salinan 1:1 `kawanabadigrup/PWA-Project-KMB2` (`ba4d81d`). Hanya satu baris alamat API di `app.js` dan `sw.js` yang diganti `./api`; empat berkas lain identik byte demi byte. Disajikan Worker `abadiops-kmbbupr-staging`; `/web` sementara menampilkan pemberitahuan.
+  - **Pintu staging**: `kmbbupr` masuk `RUMAH` (saklar `gas`; Worker BUPR staging tetap menjawab sendiri karena tanpa GAS). GAS tiruan meneruskan `/kmbbupr` ke Worker BUPR lewat ikatan `RUMAH_KMBBUPR`, jadi token BUPR dikenali oleh kode GAS asli.
+  - **Bug #36 diperbaiki**: fungsi ping Supabase di pintu masih tertanam, sehingga BUPR ditanya ke `kmb_ping` (KMB Project). Sekarang dari profil kamar.
+  - **Tayang di staging:** kmbbupr, GAS tiruan `5825d757`, pintu `c6183a21`.
+  - **Uji:**
+    - PWA, ikon, manifest, dan `/web` tersaji (200); ping lewat `./api` dijawab kode GAS asli;
+    - pintu: token BUPR → BUPR staging; token KMB Projek → KMB Projek (sebelum perbaikan: dianggap kembar); token SUM → SUM; token karangan ditolak;
+    - panel: tab, pilihan, section, dan peran BUPR benar; daftar pengguna dan config BUPR menjawab "RPC … belum terpasang" (pusat admin BUPR belum dibangun);
+    - regresi langkah 1a dan rumah lain lulus.
+  - Token kembar antar rumah: 0 di cermin produksi (Gedung 1); 2 token uji di Gedung 2 (data staging lama), salah satunya membuat token KMB TRA uji ditolak pintu staging.
+  - Data staging BUPR disegarkan dari spreadsheet per 14 Nov 13.37 WIB.
+- Belum selesai / berikutnya:
+  - Gabriel mencoba BUPR staging dari HP.
+  - (b) MAR Web asli BUPR di Worker; (c) pusat admin baru (penyunting sheet config) di BUPR; lalu rumah lain.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (jalur tulis BUPR: GAS asli di Worker menulis ke Supabase)
 - Berubah:
   - **Jalur tulis BUPR di Worker staging.** Buat WO, kirim kerja, approve L1/L2, override, tolak, kembalikan, batal, dan transfer dijalankan kode GAS BUPR @9 yang asli. Tulisannya disimpan ke cermin `kmbbupr` Gedung 2 dalam satu transaksi.

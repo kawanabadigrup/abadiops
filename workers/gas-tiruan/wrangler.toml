@@ -8,6 +8,12 @@ workers_dev = true
 
 account_id = "9273ece6d47a3bb103159295c10ce9e6"
 
+# Kamar yang menjalankan kode GAS asli di Worker-nya sendiri: permintaan /<kode> diteruskan ke Worker itu.
+# Nama ikatan RUMAH_<KODE KAMAR> (src/index.js membacanya dari kode kamar).
+services = [
+  { binding = "RUMAH_KMBBUPR", service = "abadiops-kmbbupr-staging" }
+]
+
 [vars]
 SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
 SUPABASE_ANON_KEY = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O"

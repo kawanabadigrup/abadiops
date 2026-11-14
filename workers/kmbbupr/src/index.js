@@ -30,13 +30,25 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.endsWith('/api/sehat')) return sehat(env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    if (url.pathname === '/' || /\/api\/?$/.test(url.pathname)) {
+    // API: PWA memanggil ./api; POST ke akar juga dilayani, sama dengan web app GAS.
+    if (/\/api\/?$/.test(url.pathname) || (url.pathname === '/' && request.method === 'POST')) {
       if (request.method !== 'POST') return new Response('Hanya POST', { status: 405, headers: { ...CORS, 'Content-Type': 'text/plain; charset=utf-8' } });
       return tanganiApi(request, env, url);
     }
-    return new Response('Tidak ditemukan', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    if (url.pathname === '/web' || url.pathname.startsWith('/web/')) return webBelumAda();
+    // File PWA BUPR (pwa/kmbbupr). Akar folder → index.html, disajikan langsung tanpa redirect.
+    if (url.pathname.endsWith('/')) return env.ASSETS.fetch(new Request(new URL(url.pathname + 'index.html', url), request));
+    return env.ASSETS.fetch(request);
   },
 };
+
+// MAR Web BUPR (halaman web GAS yang asli, dijalankan di Worker) belum dipindah.
+function webBelumAda() {
+  return new Response(`<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAR BUPR</title><style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;color:#222}</style></head>
+<body><h1>MAR Web BUPR belum tersedia</h1><p>Halaman web sedang dipindahkan. Untuk sementara pakai <a href="./">Aplikasi (PWA)</a>.</p></body></html>`,
+  { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+}
 
 function profil(env) {
   const p = PROFIL_RUMAH[env.RUMAH];

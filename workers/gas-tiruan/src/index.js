@@ -81,6 +81,18 @@ export default {
       return responJson({ success: false, error: 'Kamar tidak dikenal. Pakai alamat /<kode kamar> sesuai config/rumah.json.' });
     }
 
+    // Kamar yang menjalankan kode GAS ASLI di Worker-nya sendiri (GAS asli di Worker, misalnya kmbbupr): diteruskan
+    // apa adanya ke Worker itu lewat ikatan layanan RUMAH_<KODE> (wrangler.toml), karena di sanalah "GAS"-nya.
+    const ikatanRumah = rumah && env['RUMAH_' + rumah.toUpperCase()];
+    if (ikatanRumah && typeof ikatanRumah.fetch === 'function') {
+      const r = await ikatanRumah.fetch('https://rumah.internal/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(parsed),
+      });
+      return new Response(await r.text(), { status: r.status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+
     // Jalankan penanganan aksi
     return tanganiAksi(action, token, rumah, { ...parsed, ...dataObj }, env);
   },

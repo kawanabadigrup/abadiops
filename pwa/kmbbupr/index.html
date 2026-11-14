@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#5E5E5E">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon-192.png">
+  <!-- iOS: dukungan Add to Home Screen (Safari tidak baca manifest sepenuhnya) -->
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MAR BUPR">
+  <title>MAR BUPR</title>
+  <style>
+    /* ===== DESIGN SYSTEM ENTERPRISE (token identik dgn web GAS Theme.gs) ===== */
+    :root{
+      --bg:#F8FAFC;--bg-secondary:#F3F4F6;--card:#FFFFFF;--border:#E5E7EB;
+      --text:#111827;--text-secondary:#6B7280;--text-disabled:#9CA3AF;
+      --primary:#5E5E5E;--primary-hover:#474747;--primary-active:#2F2F2F;
+      --primary-soft:#F1F1F1;--primary-container:#E2E2E2;
+      --success:#10B981;--warning:#F59E0B;--error:#EF4444;
+      --input-border:#D1D5DB;--radius:16px;--radius-sm:10px;
+      --shadow:0 4px 12px rgba(0,0,0,.05);--shadow-hover:0 8px 24px rgba(0,0,0,.08);
+      --focus-ring:0 0 0 3px rgba(94,94,94,.25);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .top{position:sticky;top:0;background:var(--card);padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);box-shadow:0 1px 2px rgba(0,0,0,.04);z-index:5}
+    .top h1{font-size:16px;font-weight:700;color:var(--text);flex:1}
+    .dot{width:9px;height:9px;border-radius:50%;background:var(--error)}
+    .net{font-size:11px;color:var(--text-secondary)}
+    .logoutBtn{font-size:11px;color:var(--text-secondary);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer}
+    .wrap{padding:16px;max-width:580px;margin:0 auto;transition:max-width 0.2s ease}
+    @media (min-width: 900px){
+      .wrap{max-width:920px}
+      .bulk-floating-bar{max-width:920px !important}
+      #bulkConfirmModal .sheet{max-width:920px !important}
+    }
+    .tabBar{display:none;gap:6px;margin-bottom:14px;background:var(--bg-secondary);border-radius:12px;overflow:hidden;border:1px solid var(--border);padding:4px}
+    .tab{flex:1;text-align:center;padding:10px 4px;font-size:13px;font-weight:700;color:var(--text-secondary);cursor:pointer;border:none;background:none;border-radius:8px}
+    .tab.active{background:var(--primary);color:#fff}
+    .card,.panel{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:var(--shadow)}
+    .cardTop{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+    .badge{font-size:10px;font-weight:700;color:#fff;padding:3px 9px;border-radius:99px;white-space:nowrap}
+    .cardBody{font-size:13px;color:var(--text-secondary);line-height:1.5}
+    .ket{font-size:12px;color:#B45309;margin-top:6px;background:#FEF3C7;padding:6px 9px;border-radius:8px}
+    .err{border-color:#FECACA;background:#FEF2F2;font-size:12px;color:#DC2626}
+    .big{display:block;width:100%;margin-top:10px;padding:13px;font-size:15px;font-weight:700;color:#fff;background:var(--primary);border:0;border-radius:var(--radius-sm);cursor:pointer}
+    .big:hover{background:var(--primary-hover)}
+    .big:active{background:var(--primary-active);transform:scale(0.98)}
+    .big.danger{background:var(--error);color:#fff}
+    .big.secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+    .mini{padding:6px 11px;font-size:12px;border:0;border-radius:8px;background:var(--primary);color:#fff;font-weight:700;margin-top:5px;cursor:pointer}
+    .mini.gray{background:var(--card);color:var(--text);border:1px solid var(--border)}
+    .empty{text-align:center;color:var(--text-disabled);padding:40px 10px;line-height:1.7}
+    .sub{font-size:12px;color:var(--text-secondary);margin:3px 0 8px}
+    .inp,select{width:100%;padding:11px;font-size:15px;background:var(--card);color:var(--text);border:1px solid var(--input-border);border-radius:var(--radius-sm);margin:4px 0 12px}
+    .inp:focus,select:focus,input:focus{border-color:var(--primary);box-shadow:var(--focus-ring);outline:none}
+    label{font-size:12px;color:var(--text-secondary);font-weight:600}
+    /* minmax(0,1fr) + min-width:0 WAJIB, bukan `1fr 1fr`. `1fr` = minmax(auto,1fr),
+       dan `auto` melarang track menyusut di bawah lebar min-content isinya.
+       Isi kolom waktu lebar (tanggal + jam + menit), jadi dua kolom `1fr`
+       memaksa grid lebih lebar dari layar HP — kolom "Selesai" tertimpa lalu
+       meleset keluar layar. Persoalan yang sama sudah diperbaiki di PWA SUM. */
+    .row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .row2>*{min-width:0}
+    @media (max-width:520px){.row2{grid-template-columns:1fr}}
+
+    /* ── Picker tanggal & jam 24 jam (lihat dtHtml di app.js) ──────────────
+       Jam dibuat sendiri karena picker bawaan mengikuti LOCALE PERANGKAT dan
+       memunculkan AM/PM di ponsel ber-locale Inggris — bentuk yang tak dipakai
+       di lapangan sini dan sumber salah isi yang mahal (jalur uang). */
+    .dt24{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:5px;align-items:center}
+    .dt24 .dtTgl{min-width:0}
+    .dt24 .dtJam,.dt24 .dtMnt{min-width:0;width:auto;padding-left:7px;padding-right:3px;
+      font-variant-numeric:tabular-nums;text-align:center}
+    .dt24 .dtTitik{font-weight:700;opacity:.55}
+    @media (max-width:380px){.dt24{gap:3px}}
+    .secPicker{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 12px}
+    .secOpt input[type="radio"]{display:none}
+    .secCard{display:inline-block;padding:8px 14px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;color:var(--text-secondary);background:var(--card)}
+    .secOpt input:checked+.secCard{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+    .teamRow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+    .teamRow select{flex:1;min-width:0}   /* nama mekanik panjang tak boleh melebarkan baris */
+    /* Override L1/L2 — 1:1 dengan modal Edit Override di web (Approval.html) */
+    .ovBox{background:var(--primary-soft);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px;margin:8px 0}
+    .ovLog{background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 12px;margin:8px 0}
+    .ovLogTitle{font-size:11px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px}
+    .ovLogItem{font-size:12px;color:var(--text);margin-bottom:5px}
+    .ovLogItem:last-child{margin-bottom:0}
+    .ovLogWho{font-weight:800;color:var(--text)}
+    .ovLogTime{font-size:10px;color:var(--text-disabled);margin-left:5px}
+    .ovLogList{margin:3px 0 0 15px;padding:0}
+    .ovLogList li{font-size:12px;line-height:1.6}
+    .ovTag{display:inline-block;font-size:10px;font-weight:800;color:#fff;border-radius:4px;padding:1px 6px;margin-right:5px}
+    .ovTag.l1{background:#4338ca}
+    .ovTag.l2{background:#7c3aed}
+    .ovJd{margin-top:4px;background:var(--card);border-radius:6px;padding:5px 7px;font-size:12px}
+    /* Kolom acuan grup yang terkunci — garis luar MERAH, bukan sekadar pudar.
+       Pudar terbaca seperti "belum aktif"; merah terbaca "sengaja dikunci". */
+    .terkunci{border:2px solid var(--error)!important;background:#FEF2F2!important;cursor:not-allowed}
+    .terkunciBox{outline:2px solid var(--error);outline-offset:2px;border-radius:8px}
+    /* ── KOTAK ISIAN (fbox) ──────────────────────────────────────────────────
+       Tiap keputusan dikotakkan sendiri. Form ini diisi mekanik sambil berdiri
+       di lapangan, bersarung tangan, silau, dan perhatian terbagi — deretan
+       label+select yang menyambung tanpa jeda membuat orang melewati satu
+       kolom atau memencet yang salah. Satu kotak = satu hal yang diputuskan. */
+    .fbox{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+          padding:12px;margin-bottom:10px}
+    .fbox>label:first-child,.fboxHead{display:block;font-size:11px;font-weight:800;
+          letter-spacing:.05em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:7px}
+    .fbox .inp,.fbox select{margin:0 0 8px}
+    .fbox .inp:last-child,.fbox select:last-child{margin-bottom:0}
+    .fbox .secPicker{margin:0}
+    .fbox.wajib{border-left:3px solid var(--primary)}
+    .fbox.opsional{border-left:3px solid var(--border)}
+    /* Kotak yang seluruh acuannya terkunci — merah, sekali lihat langsung jelas */
+    .fbox.terkunciBox{outline:none;border:2px solid var(--error);background:#FEF2F2}
+    /* ── KARTU BORONGAN (WO Saya) ────────────────────────────────────────────
+       Satu borongan bisa berisi 5–10 WO. Tanpa sekat tegas, mekanik kehilangan
+       jejak baris mana yang sedang dia kerjakan — timer, tombol, dan nomor WO
+       tiap baris jadi terlihat menyatu. Tiap baris diberi kotak sendiri. */
+    .grupHead{background:var(--primary-soft);border:1px solid var(--border);
+              border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:11px 12px;margin-bottom:10px}
+    .woLine{background:var(--bg-secondary);border:1px solid var(--border);
+            border-radius:var(--radius-sm);padding:12px;margin-bottom:10px}
+    .woLine:last-of-type{margin-bottom:12px}
+    .woLineNo{display:inline-flex;align-items:center;justify-content:center;
+              min-width:22px;height:22px;border-radius:6px;background:var(--primary);color:#fff;
+              font-size:11px;font-weight:800;margin-right:7px;flex-shrink:0}
+    /* ── BADGE & INFO WO ─────────────────────────────────────────────────────
+       cardTop memakai space-between, jadi badge terlempar ke tepi dan L1
+       berjauhan dari section. Dikumpulkan dalam satu wadah rapat di kanan. */
+    /* Label–nilai sejajar. Sebelumnya keterangan ditulis mengalir dengan
+       pemisah titik dan hanya SEBAGIAN baris berikon, sehingga barisnya
+       menjorok tidak rata dan sulit dipindai. Ikon dibuang dari sini —
+       yang utama isinya terbaca, bukan hiasannya. */
+    .woInfo{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;
+            font-size:13px;line-height:1.45;margin-top:7px}
+    .woInfo .k{color:var(--text-secondary);white-space:nowrap}
+    .woInfo .v{color:var(--text);min-width:0;overflow-wrap:anywhere}
+    .woInfo .v b{color:var(--text)}
+    /* Nilai dari sistem di panel override — dibedakan dari isian supaya jelas
+       mana angka yang sedang ditimpa dan mana yang sedang diketik. */
+    .ovSis{font-size:12px;color:var(--text-secondary);background:var(--bg-secondary);
+           border-radius:6px;padding:5px 8px;margin-bottom:7px}
+    .ovSis b{color:var(--text)}
+    /* ── BILAH KETERANGAN ────────────────────────────────────────────────────
+       Satu kotak menyambung, terbagi rata sebanyak keterangannya. Sebelumnya
+       badge terpencar dan terbaca seperti hiasan lepas; sebagai satu bilah
+       utuh ia terbaca sebagai "ini keterangan WO-nya".
+       flex:1 1 0 + min-width:0 → tiap iris SAMA LEBAR berapa pun panjang
+       tulisannya, bukan mengikuti panjang teks. */
+    .ketBar{display:flex;border-radius:8px;overflow:hidden;margin-top:8px;
+            border:1px solid var(--border)}
+    .ketSeg{flex:1 1 0;min-width:0;padding:7px 5px;text-align:center;
+            font-size:11px;font-weight:700;color:#fff;line-height:1.3;
+            display:flex;align-items:center;justify-content:center}
+    .ketSeg + .ketSeg{border-left:1px solid rgba(255,255,255,.35)}
+    /* ── PITA PERHATIAN ──────────────────────────────────────────────────────
+       Hal yang WAJIB disadari approver sebelum memutuskan, dipisah dari bilah
+       keterangan. Disamaratakan jadi iris sama besar justru menghilangkan
+       bobotnya — "Dibuat Mekanik" terbaca seperti label biasa, padahal itu
+       tanda supaya WO-nya ditelaah lebih teliti. */
+    .awBar{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+    .awChip{display:flex;align-items:center;gap:7px;border-radius:8px;
+            padding:8px 10px;font-size:12px;font-weight:800;color:#fff;
+            box-shadow:0 1px 3px rgba(0,0,0,.18)}
+    .awChip .awNote{font-weight:600;opacity:.9;font-size:11px}
+    /* ── KEPALA BAGIAN (WO Saya) ─────────────────────────────────────────────
+       Daftar mekanik dipilah per keadaan. Tanpa ini WO yang sudah disetujui
+       dan yang ditolak ikut menumpuk di antara yang masih harus dikerjakan,
+       dan yang paling menuntut tindakan justru terkubur paling bawah. */
+    .secHead{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;
+             background:var(--card);border:1px solid var(--border);border-left:4px solid var(--border);
+             border-radius:var(--radius-sm);padding:11px 13px;margin:14px 0 10px}
+    .secHead:first-child{margin-top:0}
+    .secJudul{flex:1;font-size:14px;font-weight:800;color:var(--text)}
+    .secJml{min-width:24px;text-align:center;color:#fff;font-size:11px;font-weight:800;
+            border-radius:99px;padding:3px 8px}
+    .secPanah{font-size:13px;color:var(--text-secondary);font-weight:800}
+    /* ── MENU WO SAYA ────────────────────────────────────────────────────────
+       Daftar dipilah jadi menu kotak vertikal, satu keadaan per kotak. Sebelumnya
+       semuanya bertumpuk di satu layar gulir panjang; di lapangan, satu layar =
+       satu hal yang perlu diputuskan jauh lebih mudah dipakai. */
+    .menuBox{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+             font-family:inherit;background:var(--card);border:1px solid var(--border);
+             border-left:5px solid var(--border);border-radius:var(--radius-sm);
+             padding:15px 14px;margin-bottom:10px;cursor:pointer;box-shadow:var(--shadow)}
+    .menuBox:active{transform:scale(.99)}
+    .menuIkon{font-size:20px;line-height:1;flex-shrink:0}
+    .menuTeks{flex:1;min-width:0;display:block}
+    .menuJudul{display:block;font-size:15px;font-weight:800;color:var(--text)}
+    .menuSub{display:block;font-size:12px;color:var(--text-secondary);margin-top:2px}
+    .menuJml{min-width:30px;text-align:center;color:#fff;font-size:13px;font-weight:800;
+             border-radius:99px;padding:5px 10px;flex-shrink:0}
+    .menuPanah{font-size:16px;color:var(--text-disabled);font-weight:800;flex-shrink:0}
+    .btnKembali{display:flex;align-items:center;gap:8px;background:none;border:0;
+                color:var(--primary);font-size:14px;font-weight:800;padding:4px 0 10px;cursor:pointer}
+    .obinfo{font-size:12px;color:#B45309;font-weight:700;margin-bottom:6px}
+    .modal{display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:50;align-items:flex-end;justify-content:center}
+    .sheet{background:var(--card);width:100%;max-width:560px;border-radius:var(--radius) var(--radius) 0 0;padding:20px 16px 24px;max-height:92vh;overflow-y:auto}
+    .sheet h2{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
+    .sheet .desc{font-size:13px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5}
+    #toast{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;font-weight:700;padding:11px 16px;border-radius:var(--radius-sm);font-size:13px;z-index:99;max-width:92vw;text-align:center;box-shadow:var(--shadow-hover)}
+    .syncbar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .syncbar button{flex:0 0 auto}
+    .chkRow{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:13px;color:var(--text)}
+    .chkRow input[type="checkbox"]{width:18px;height:18px;accent-color:var(--primary)}
+    /* ── LAYAR LOGIN (port UX SUM V2; dipakai gradasi abu-abu, bukan foto.
+       Warnanya sengaja BEDA dari tema lain: dua sistem sewarna
+       membuat orang salah memasukkan data ke sistem yang keliru.) ── */
+    #screen-login.loginBg{
+      position:fixed;top:0;left:0;right:0;bottom:0;max-width:none;margin:0;padding:20px 0;
+      display:flex;align-items:center;justify-content:center;overflow-y:auto;z-index:20;
+      background:linear-gradient(160deg,#1C1C1C 0%,#2F2F2F 45%,#5E5E5E 100%);
+    }
+    /* margin:auto pada anak flex = benar-benar di tengah, dan tetap bisa di-scroll
+       bila layar pendek / keyboard HP terbuka (tidak terpotong di atas). */
+    #screen-login.loginBg > div{ margin:auto; }
+    #screen-login.loginBg .panel{
+      position:relative;z-index:1;width:100%;max-width:400px;margin:16px;
+      background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,.6);box-shadow:0 18px 44px rgba(0,0,0,.35);
+    }
+    .loginBrand{position:relative;z-index:1;text-align:center;margin-bottom:14px}
+    .loginBrand img{width:64px;height:64px;border-radius:16px;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+    .loginBrand h1{color:#fff;font-size:19px;font-weight:800;margin-top:9px;text-shadow:0 2px 10px rgba(0,0,0,.55)}
+    .loginBrand p{color:rgba(255,255,255,.85);font-size:12px;margin-top:2px;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+    @media(max-height:640px){ .loginBrand img{width:52px;height:52px} .loginBrand h1{font-size:17px} }
+    /* Spinner kecil — dipakai layar login & tombol Sync (port SUM V2) */
+    .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--primary-container);border-top-color:var(--primary);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:5px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    /* LIVE TIMER (port 1:1 dari SUM V2) */
+    .timerPill{background:var(--primary-soft);border:1px solid var(--primary-container);border-radius:var(--radius-sm);padding:10px;text-align:center;margin:10px 0}
+    .timerClock{font-size:24px;font-weight:800;font-family:monospace;color:var(--primary-active)}
+    .timerBtns{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+    .timerBtn{padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;border:none;cursor:pointer}
+    .btnStart{background:#10b981;color:#fff}
+    .btnPause{background:#f59e0b;color:#fff}
+    .btnStop{background:#ef4444;color:#fff}
+    /* Reset menghapus jam kerja. Sengaja bergaya garis luar & paling redup —
+       tindakan merusak tidak boleh terlihat semenarik Start atau Finish. */
+    .btnReset{background:transparent;color:#6b7280;border:1px solid #d1d5db}
+
+    /* ── COMPACT LIST VIEW WITH EXPANDABLE DETAIL ── */
+    .compact-wo-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition: all 0.2s ease;
+      overflow: hidden;
+    }
+    .compact-wo-item.selected-wo-card {
+      border: 2px solid var(--primary) !important;
+      background: var(--primary-soft) !important;
+      box-shadow: 0 4px 14px rgba(94, 94, 94, 0.22) !important;
+    }
+    .compact-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px 12px;
+      flex-wrap: wrap;
+      padding: 9px 12px;
+      background: #F8FAFC;
+      border-bottom: 1px solid var(--border);
+    }
+    .compact-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .compact-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .compact-card-body {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px 14px;
+      padding: 10px 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+      background: var(--card);
+    }
+    .compact-card-body:hover {
+      background: rgba(94, 94, 94, 0.03);
+    }
+    .c-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 12px;
+      min-width: 0;
+    }
+    .c-cell-k {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 2px;
+    }
+    .c-wo-num {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.2px;
+    }
+    .c-wo-time {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .c-badges-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+    .c-badge-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
+    }
+    .c-badge-warn {
+      background: #FEF3C7;
+      color: #92400E;
+      border: 1px solid #FCD34D;
+    }
+    .c-badge-rev {
+      background: #EDE9FE;
+      color: #5B21B6;
+      border: 1px solid #DDD6FE;
+    }
+    .c-badge-mech {
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+    }
+    .c-badge-grp {
+      background: #E0E7FF;
+      color: #3730A3;
+      border: 1px solid #C7D2FE;
+    }
+    .c-unit-title {
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .c-job-name {
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .c-sub-info {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .c-duration-text {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .c-team-summary {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .btn-detail-toggle {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 9px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .btn-detail-toggle:hover {
+      background: var(--border);
+    }
+    .btn-act-approve {
+      background: #10B981;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(16,185,129,0.3);
+      transition: all 0.15s;
+    }
+    .btn-act-approve:hover {
+      background: #059669;
+    }
+    .btn-act-approve:active {
+      transform: scale(0.96);
+    }
+    .btn-act-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .btn-act-icon:hover {
+      background: var(--bg-secondary);
+    }
+    .btn-act-icon.danger {
+      color: #EF4444;
+      border-color: #FECACA;
+    }
+    .btn-act-icon.danger:hover {
+      background: #FEF2F2;
+    }
+
+    /* Expandable Detail Pane */
+    .compact-detail-pane {
+      display: none;
+      border-top: 1px solid var(--border);
+      background: #FBFBFB;
+      padding: 14px 16px;
+      font-size: 12px;
+      animation: fadeInDetail 0.2s ease;
+    }
+    @keyframes fadeInDetail {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .detail-section-box {
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .detail-section-box.warn {
+      background: #FFFBEB;
+      border: 1px solid #FDE68A;
+      color: #92400E;
+    }
+    .detail-section-box.ok {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      color: #166534;
+    }
+    .detail-section-box.info {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1E40AF;
+    }
+    .detail-grid-specs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .spec-k {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .spec-v {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .detail-team-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .team-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .team-table th {
+      text-align: left;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 4px 6px;
+    }
+    .team-table td {
+      padding: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (max-width: 768px) {
+      .compact-card-body {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 12px;
+      }
+    }
+    @media (max-width: 440px) {
+      .compact-card-body {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .compact-header-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+
+    /* ── BULK APPROVAL SYSTEM ── */
+    .card.selected-wo-card {
+      border: 2px solid var(--primary) !important;
+      background: var(--primary-soft) !important;
+      box-shadow: 0 4px 14px rgba(94, 94, 94, 0.22) !important;
+    }
+    #bulkConfirmModal {
+      align-items: flex-end;
+    }
+    #bulkConfirmModal .sheet {
+      margin-bottom: 84px !important;
+      border-radius: var(--radius) !important;
+      max-height: calc(88vh - 84px) !important;
+      box-shadow: 0 -8px 30px rgba(0,0,0,0.35);
+    }
+    .wo-chk-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 4px;
+      margin: -4px -4px -4px 0;
+      border-radius: 6px;
+    }
+    .wo-select-chk {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .bulk-floating-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 560px;
+      margin: 0 auto;
+      background: #1E293B;
+      color: #F8FAFC;
+      padding: 12px 16px;
+      padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 45;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+      border-top: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px 16px 0 0;
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bulk-floating-bar.show {
+      display: flex;
+      transform: translateY(0);
+    }
+    .bulk-badge-pill {
+      background: #F59E0B;
+      color: #0F172A;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      white-space: nowrap;
+    }
+    .btn-bulk-cancel {
+      background: transparent;
+      color: #94A3B8;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-bulk-cancel:hover {
+      background: #334155;
+      color: #FFFFFF;
+    }
+    .btn-bulk-action {
+      background: #10B981;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn-bulk-action:active {
+      transform: scale(0.97);
+    }
+    .bulk-table-wrap {
+      max-height: 280px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--card);
+      margin-bottom: 8px;
+    }
+    .bulk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 440px;
+    }
+    .bulk-table th {
+      background: var(--bg-secondary);
+      padding: 8px 10px;
+      border-bottom: 2px solid var(--border);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .bulk-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .bulk-table tr:hover {
+      background: #F8FAFC;
+    }
+    .bulk-table tr.has-safety {
+      background: #FEF2F2;
+    }
+    .bulk-table tr.has-redo {
+      background: #FFFBEB;
+    }
+    .bulk-table tr.has-safety.has-redo {
+      background: #FFF1F2;
+    }
+    .bulk-log-box {
+      max-height: 220px;
+      overflow-y: auto;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bulk-log-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      gap: 8px;
+    }
+    .bulk-log-item.success {
+      border-color: #86EFAC;
+      background: #F0FDF4;
+      color: #166534;
+      font-weight: 600;
+    }
+    .bulk-log-item.fail {
+      border-color: #FCA5A5;
+      background: #FEF2F2;
+      color: #991B1B;
+      font-weight: 600;
+    }
+    .bulk-log-item.running {
+      border-color: #FDE68A;
+      background: #FFFBEB;
+      color: #92400E;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <h1>🔧 KMB MAR BUPR</h1>
+    <span class="dot" id="netDot"></span><span class="net" id="netText">-</span>
+    <button class="logoutBtn" id="installBtn" style="display:none;background:var(--primary);color:#fff;border-color:var(--primary)" onclick="doInstall()">📲 Instal</button>
+    <button class="logoutBtn" onclick="doLogout()">Logout</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="wrap loginBg" id="screen-login" style="display:none">
+    <div style="position:relative;z-index:1;width:100%;max-width:400px;display:flex;flex-direction:column;align-items:center">
+    <div class="loginBrand">
+      <img src="./icon-192.png" alt="KMB MAR BUPR">
+      <h1>KMB MAR BUPR</h1>
+      <p>Mechanic Activity Report</p>
+    </div>
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px"><h2 style="color:#111827;font-size:16px">Masukkan Token</h2><span id="loginVersion" style="font-size:11px;font-weight:700;color:#6B7280;background:var(--bg-secondary);border:1px solid var(--border);border-radius:99px;padding:3px 9px">-</span></div>
+      <p class="sub">Token dari admin, cukup diisi SEKALI.</p>
+      <input class="inp" id="tokenInput" placeholder="token..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="big" id="btnLogin" onclick="doLogin()">Masuk</button>
+      <div id="loginLoading" style="display:none;margin-top:10px;text-align:center;font-size:13px;font-weight:700;color:#4C4C4C"><span class="spin"></span> Memeriksa token…</div>
+    </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="wrap" id="screen-main" style="display:none">
+    <div class="syncbar">
+      <button class="mini" id="syncBtn" onclick="syncNow(true)">🔄 Refresh</button>
+      <div style="flex:1"><div style="font-size:13px;font-weight:700" id="meName"></div><div class="sub" style="margin:0" id="lastSync"></div></div>
+      <button class="mini gray" id="verBtn" onclick="bukaCekVersi()" title="Cek versi aplikasi">⬆️ Versi</button>
+    </div>
+    <div class="obinfo" id="outboxInfo" onclick="toggleOutboxDetail()" style="cursor:pointer"></div>
+    <div id="outboxDetail" style="display:none;margin-bottom:8px"></div>
+    <div id="failedOps"></div>
+    <div class="tabBar" id="tabBar">
+      <button class="tab active" id="tabWos" onclick="switchTab('wos')">📋 WO Saya</button>
+      <button class="tab" id="tabCreate" onclick="switchTab('create')">➕ Buat WO</button>
+      <button class="tab" id="tabApproval" onclick="switchTab('approval')">✅ Approval</button>
+      <button class="tab" id="tabMonitor" onclick="switchTab('monitor')">👥 Monitoring</button>
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <!-- MODAL: Submit (M1) -->
+  <div class="modal" id="submitModal">
+    <div class="sheet">
+      <h2 id="fTitle">-</h2>
+      <div class="desc" id="fDesc"></div>
+      <div class="ket" id="fKet" style="display:none"></div>
+      <!-- LIVE TIMER — picker jam DI BAWAH
+           ini tetap terlihat dan boleh dikoreksi manual. Timer hanya mengisinya. -->
+      <div class="timerPill" id="modalTimerPill">
+        <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:2px">⏱️ LIVE TIMER REKAM WAKTU</div>
+        <div class="timerClock" id="modalTimerDisplay">00:00:00</div>
+        <div class="timerBtns">
+          <button type="button" class="timerBtn btnStart" id="modalBtnStart" onclick="modalTimerStart()">▶ Start</button>
+          <button type="button" class="timerBtn btnPause" id="modalBtnPause" onclick="modalTimerPause()" style="display:none">⏸ Pause</button>
+          <button type="button" class="timerBtn btnStop" id="modalBtnStop" onclick="modalTimerStop()" style="display:none">⏹ Finish &amp; Isi Jam</button>
+          <button type="button" class="timerBtn btnReset" id="modalBtnReset" onclick="modalTimerReset()" style="display:none">↺ Reset</button>
+        </div>
+        <div id="fTimerSummary" style="display:none;margin-top:9px;background:#DCFCE7;border:1px solid #86EFAC;color:#166534;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;text-align:center"></div>
+        <div style="font-size:11px;color:#0284c7;margin-top:7px;line-height:1.5">▶ mulai kerja · ⏸ jeda · ⏹ selesai. Durasi terhitung otomatis &amp; tersimpan walau app ditutup. Memulai WO lain akan menjeda WO ini. Jam di bawah boleh Anda koreksi manual.</div>
+      </div>
+
+      <div class="row2">
+        <div><label>Jam Mulai *</label><div id="slotFStart"></div></div>
+        <div><label>Jam Selesai *</label><div id="slotFEnd"></div></div>
+      </div>
+      <!-- Bacaan balik durasi dari kedua picker. Angka jam/menit di dua kolom
+           terpisah sulit dijumlahkan di kepala, apalagi kalau melewati tengah
+           malam — tanpa ini orang baru sadar jamnya keliru setelah terkirim. -->
+      <div id="fDurBox" style="display:none;margin-top:8px;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;text-align:center"></div>
+      <!-- HM & KM disembunyikan di semua section (1 Agu 2026), opsional di server -->
+      <div class="row2" id="hmKmWrap" style="display:none">
+        <div><label>Hour Meter</label><input type="number" class="inp" id="fHm" min="0.1" step="any" placeholder="1250"></div>
+        <div><label>Kilometer</label><input type="number" class="inp" id="fKm" min="0.1" step="any" placeholder="4500"></div>
+      </div>
+      <!-- Spare part tidak relevan untuk pekerjaan tyreman → disembunyikan per
+           section (lihat openSubmitForm). 1:1 dengan web. -->
+      <div id="partWrap">
+        <label>Spare Part</label>
+        <select class="inp" id="fPart"><option value="">Tanpa Part</option><option value="baru">🆕 Baru</option><option value="repair">🔧 Repair</option><option value="kanibal">♻️ Kanibal</option></select>
+      </div>
+      <button class="big" onclick="queueSubmit()">📮 Kirim</button>
+
+      <!-- TRANSFER WO: oper ke shift berikutnya. Jam Mulai di atas dipakai
+           sebagai awal sesi; jam berhenti ditetapkan server saat diterima.
+           Hour Meter & KM tidak diminta di sini — itu untuk WO yang selesai. -->
+      <div style="border-top:1px solid #e5e7eb;margin:14px 0 10px"></div>
+      <label>Catatan bila WO dioper ke shift berikutnya (opsional)</label>
+      <textarea class="inp" id="fTransferNote" rows="2" placeholder="cth: baut roda kiri belum kencang, tinggal torsi ulang"></textarea>
+      <!-- Sengaja "secondary" (garis luar), bukan oranye pekat. Yang utama adalah
+           "Simpan & Antre"; transfer hanya jalan keluar bila WO belum selesai.
+           Lebarnya tetap penuh — mekanik memencet ini pakai sarung tangan di
+           lapangan, jadi bobot visualnya yang diturunkan, bukan area sentuhnya. -->
+      <button class="big secondary" style="color:#c05621;border-color:#f6ad55" onclick="queueTransfer()">🔁 Transfer ke Shift Berikutnya</button>
+
+      <button class="big secondary" onclick="closeModal('submitModal')">Batal</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Create WO (M2) -->
+  <div class="modal" id="createModal">
+    <div class="sheet">
+      <h2>➕ Buat Work Order</h2>
+
+      <!-- WO GROUP: satu borongan = beberapa baris job, tiap baris tetap WO utuh.
+           Dua arah, karena pola kerja lapangan memang dua macam. -->
+      <div class="fbox wajib">
+        <label>Cara pembuatan</label>
+        <div class="secPicker" id="cModePicker">
+          <label class="secOpt"><input type="radio" name="cmode" value="" checked onchange="onGrupModeChange()"><span class="secCard">1 WO saja</span></label>
+          <label class="secOpt"><input type="radio" name="cmode" value="unit" onchange="onGrupModeChange()"><span class="secCard">1 unit · banyak job</span></label>
+          <label class="secOpt"><input type="radio" name="cmode" value="job" onchange="onGrupModeChange()"><span class="secCard">1 job · banyak unit</span></label>
+        </div>
+        <div class="sub" id="cModeHint" style="display:none;margin:7px 0 0"></div>
+      </div>
+
+      <div class="fbox wajib" id="cSecBox">
+        <label>Section</label>
+        <div class="secPicker" id="cSecPicker"></div>
+      </div>
+
+      <div class="fbox wajib" id="cWcBox">
+        <label>Work Condition</label>
+        <select class="inp" id="cWc" onchange="updateCreatePreview()"></select>
+      </div>
+
+      <!-- Kolom ACUAN grup dipindah ke sini (tepat di bawah Work Condition):
+           mode 'unit' → pemilih unit, mode 'job' → pemilih job. Yang dipilih
+           sekali harus terbaca lebih dulu; yang berulang di bawahnya. -->
+      <div id="cAnchorSlot"></div>
+
+      <!-- Tyreman path -->
+      <div id="cTyreGroup">
+        <div class="fbox wajib" id="cTyreJobWrap">
+          <label>Joblist Mekanik</label>
+          <select class="inp" id="cComp" onchange="onCompChange()"></select>
+        </div>
+        <div class="fbox wajib" id="cTyreUnitWrap">
+          <label>Unit</label>
+          <select class="inp" id="cTyreUnit" onchange="onPilihUnitTyre()"></select>
+          <div class="sub" id="cInfoUnitTyre" style="display:none;margin:7px 0 0"></div>
+          <button type="button" class="mini gray" id="cBtnSemuaUnit" onclick="toggleSemuaUnit()">🌐 Tampilkan semua unit</button>
+        </div>
+      </div>
+
+      <!-- Others fields (semua section) -->
+      <div class="fbox wajib" id="cOthersWrap" style="display:none">
+        <label>Job manual (Others)</label>
+        <span class="fboxHead" style="margin:0 0 4px">Deskripsi job</span>
+        <input class="inp" id="cOthersDesc" placeholder="cth: perbaikan velg custom" oninput="updateCreatePreview()">
+        <div class="row2">
+          <div><span class="fboxHead" style="margin:0 0 4px">Base points</span><input type="number" class="inp" id="cOthersBp" min="0.01" step="any" placeholder="0.5" oninput="updateCreatePreview()"></div>
+          <div><span class="fboxHead" style="margin:0 0 4px">Target hours</span><input type="number" class="inp" id="cOthersTh" min="0.01" step="any" placeholder="2" oninput="updateCreatePreview()"></div>
+        </div>
+        <span class="fboxHead" style="margin:0 0 4px">Unit factor</span>
+        <input type="number" class="inp" id="cOthersUf" min="0.1" step="0.01" placeholder="1.0" oninput="updateCreatePreview()">
+        <div class="sub" style="margin:7px 0 0">Pengali kesulitan (mis. 1.0 standar, 1.2 kompleks)</div>
+      </div>
+
+      <!-- Others toggle (field/workshop) -->
+      <div class="fbox opsional" id="cOthersCheckRow" style="display:none">
+        <label class="chkRow" style="margin:0"><input type="checkbox" id="cOthersCheck" onchange="onPwaOthersToggle()">📝 Job manual (Others) — di luar katalog</label>
+      </div>
+
+      <!-- Cascade path (field/workshop) -->
+      <div id="cCascadeGroup" style="display:none">
+        <div class="fbox wajib" id="cUnitGroup">
+          <label>Unit</label>
+          <select class="inp" id="cUnit" onchange="onCasUnitOrModel()"></select>
+          <div class="sub" id="cInfoUnitField" style="display:none;margin:7px 0 0"></div>
+          <button type="button" class="mini gray" onclick="toggleSemuaUnit()">🌐 Tampilkan semua unit</button>
+        </div>
+        <div class="fbox wajib" id="cModelGroup" style="display:none"><label>Model Rebuild</label><select class="inp" id="cModel" onchange="onCasUnitOrModel()"></select></div>
+        <div class="fbox wajib" id="cJobWrap">
+          <label>Job yang dikerjakan</label>
+          <span class="fboxHead" style="margin:0 0 4px">Component</span><select class="inp" id="cCasComp" onchange="onCasComp()"></select>
+          <span class="fboxHead" style="margin:0 0 4px">Sub component</span><select class="inp" id="cCasSub" onchange="onCasSub()"></select>
+          <span class="fboxHead" style="margin:0 0 4px">Job</span><select class="inp" id="cCasJob" onchange="updateCreatePreview()"></select>
+        </div>
+      </div>
+
+      <div class="fbox wajib">
+        <label>Tim Mekanik</label>
+        <label class="chkRow" id="cCrossFuncRow" style="margin:0 0 8px"><input type="checkbox" id="cCrossFunc" onchange="onCrossFuncToggle()">🔓 Tampilkan mekanik semua section (lintas fungsi)</label>
+        <div id="cTeamList"></div>
+        <button class="mini" id="cTeamAdd" onclick="addTeamMember()">+ Tambah Mekanik</button>
+        <div class="sub" id="cTeamHint" style="display:none;margin:6px 0 0">WO ini untuk Anda sendiri. Setelah kerja dikirim, WO langsung masuk approval L2.</div>
+      </div>
+
+      <!-- METER UNIT — HM atau KM tergantung section.
+           Ditambahkan 2 Sep 2026. Sebelumnya PWA sama sekali tidak merekam
+           angka meter saat membuat WO, padahal web sudah. Akibatnya setiap WO
+           yang lahir dari HP tidak menyumbang apa-apa untuk umur pakai tyre
+           maupun MTBF unit — dan tak ada satu pun tanda bahwa ia tidak.
+           Label & satuannya berganti sendiri lewat onSectionChangeMeter(). -->
+      <div class="fbox opsional" id="cMeterWrap">
+        <label><span id="cMeterNama">HM</span> Unit (opsional)</label>
+        <input class="inp" id="cMeter" type="number" step="any" min="0" inputmode="decimal" placeholder="cth: 12450">
+        <div class="sub" id="cMeterKaki" style="margin-top:5px"></div>
+      </div>
+
+      <div class="fbox opsional">
+        <label>Keterangan (opsional)</label>
+        <input class="inp" id="cKet" placeholder="cth: unit di pit 3">
+      </div>
+      <div class="panel" id="cPreview" style="display:none;background:#F3F3F3;border-color:#D1D1D1;padding:11px;margin-bottom:10px">
+        <div class="sub" style="margin:0 0 4px;font-weight:700;color:#4C4C4C">📊 Preview Poin</div>
+        <div id="cPreviewBody" style="font-size:13px;color:#111827"></div>
+      </div>
+      <!-- Keranjang baris grup — hanya tampil saat mode grup dipilih -->
+      <div id="cGrupBox" style="display:none;background:var(--primary-soft);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px;margin-bottom:10px">
+        <div class="sub" style="margin:0 0 6px;font-weight:700;color:var(--primary)">📋 Daftar dalam WO ini (<span id="cGrupCount">0</span>)</div>
+        <div class="sub" id="cLockNote" style="display:none;background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:7px 9px;margin:0 0 7px"></div>
+        <div class="sub" id="cGrupRingkas" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 9px;margin:0 0 7px"></div>
+        <div id="cGrupList"></div>
+        <button class="mini" onclick="tambahBarisGrup()" style="margin-top:6px">➕ Tambahkan ke daftar</button>
+      </div>
+
+      <button class="big" id="cBtnSatu" onclick="queueCreate(true)">➕ Simpan & Buat Lagi</button>
+      <button class="big" id="cBtnSelesai" onclick="queueCreate(false)" style="background:#15803d">📮 Simpan & Selesai</button>
+      <button class="big" id="cBtnGrup" onclick="simpanGrup()" style="display:none;background:#15803d">📮 Simpan Semua (<span id="cGrupCount2">0</span>)</button>
+      <button class="big secondary" onclick="closeModal('createModal')">Batal</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Approve/Reject (M3) -->
+  <div class="modal" id="approveModal">
+    <div class="sheet">
+      <h2 id="aTitle">-</h2>
+      <div class="desc" id="aDesc"></div>
+      <div class="sub" id="aTeam"></div>
+      <div class="sub" id="aStatus"></div>
+
+      <!-- OVERRIDE L1/L2 — 1:1 dengan modal "Edit Override" di web -->
+      <div class="ovBox">
+        <div onclick="toggleOverride()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
+          <div class="sub" style="margin:0;font-weight:700;color:var(--primary)">✏️ Override (opsional)</div>
+          <span id="ovArrow" style="font-size:14px;color:var(--primary);font-weight:800">▸</span>
+        </div>
+        <div id="ovBody" style="display:none;margin-top:9px">
+          <div class="sub" style="margin:0 0 9px">Biarkan kosong bila tidak perlu diubah — nilai dari sistem yang dipakai.</div>
+
+          <!-- Tiap hal yang bisa diubah dikotakkan sendiri, dengan nilai sistem
+               ditulis terang di atasnya. Tanpa itu approver tak tahu angka apa
+               yang sedang dia timpa. -->
+          <div class="fbox opsional">
+            <label>Base points</label>
+            <div class="ovSis">Dari sistem: <b id="aOvBpSis">-</b></div>
+            <input type="number" class="inp" id="aOvBp" min="0" step="any" placeholder="ubah di sini (poin)" oninput="perbaruiPenjagaOverride()">
+          </div>
+
+          <div class="fbox opsional">
+            <label>Target waktu</label>
+            <div class="ovSis">Dari sistem: <b id="aOvTgtSis">-</b></div>
+            <div class="row2">
+              <div><span class="fboxHead" style="margin:0 0 4px">Jam</span><input type="number" class="inp" id="aOvTgtJam" min="0" step="1" placeholder="ubah di sini (jam)" oninput="perbaruiPenjagaOverride()"></div>
+              <div><span class="fboxHead" style="margin:0 0 4px">Menit</span><input type="number" class="inp" id="aOvTgtMenit" min="0" max="59" step="1" placeholder="ubah di sini (menit)" oninput="perbaruiPenjagaOverride()"></div>
+            </div>
+            <div class="sub" style="margin:0">Jam dan menit DIJUMLAHKAN. Mau target 45 menit? Isi jam <b>0</b>, menit <b>45</b>.</div>
+          </div>
+
+          <!-- ⏱️ JALUR UANG: actual_hours → faktor ketepatan waktu → poin → rupiah -->
+          <div class="fbox opsional">
+            <label>Waktu kerja (koreksi jam mekanik)</label>
+            <div class="ovSis">Tercatat sekarang: <b id="aOvActualNow">-</b></div>
+            <div class="row2">
+              <div><span class="fboxHead" style="margin:0 0 4px">Mulai</span><div id="slotAOvStart"></div></div>
+              <div><span class="fboxHead" style="margin:0 0 4px">Selesai</span><div id="slotAOvEnd"></div></div>
+            </div>
+            <div id="aOvDurBox" style="background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:8px;padding:8px 10px;font-size:13px;font-weight:700">Durasi baru: <span id="aOvDurText">-</span></div>
+            <div class="sub" id="aOvPartialHint" style="display:none;color:#B45309;margin:7px 0 0"></div>
+          </div>
+
+          <!-- ⚠️ JALUR UANG: unit_id → unit_factor → poin → rupiah -->
+          <div class="fbox opsional">
+            <label>Unit (pindah unit)</label>
+            <div class="ovSis">Sekarang: <b id="aOvUnitSis">-</b></div>
+            <select class="inp" id="aOvUnit" onchange="perbaruiPenjagaOverride()"></select>
+            <div class="sub" style="margin:0">Seluruh unit ditampilkan tanpa saringan. Mengganti unit ikut mengubah <b>unit factor</b>, jadi poinnya berubah.</div>
+          </div>
+
+          <!-- ⚠️ JALUR UANG: work_condition → faktor kondisi → poin → rupiah -->
+          <div class="fbox opsional">
+            <label>Kondisi kerja</label>
+            <div class="ovSis">Sekarang: <b id="aOvWcSis">-</b></div>
+            <select class="inp" id="aOvWc" onchange="perbaruiPenjagaOverride()">
+              <option value="">— tidak diubah —</option>
+              <option value="normal">Shift 1</option>
+              <option value="difficult">Shift 2</option>
+              <option value="extreme">Kondisi Ekstrim</option>
+            </select>
+            <div class="sub" style="margin:0">Kondisi kerja adalah <b>pengali poin</b>. Ubah hanya bila kondisi sebenarnya memang berbeda dari yang dicatat.</div>
+          </div>
+
+          <div class="fbox opsional">
+            <label>Tim mekanik</label>
+            <div class="ovSis">Tiap anggota mendapat poin penuh</div>
+            <div id="aOvTeam"></div>
+            <button type="button" class="mini gray" onclick="aOvAddMember()">+ Tambah Mekanik</button>
+          </div>
+
+          <!-- Judgment: berjenjang — tulisan L1 diwarisi L2, L2 boleh ubah/hapus -->
+          <div class="fbox opsional">
+            <label>Judgment / catatan approver</label>
+            <div class="ovSis">Alasan kenapa pengerjaan lama atau menyimpang. Tampil di dashboard.</div>
+            <div class="sub" id="aOvJdSource" style="display:none;background:var(--primary-soft);border-radius:6px;padding:5px 7px;margin:0 0 6px"></div>
+            <textarea class="inp" id="aOvJudgment" rows="3" maxlength="500" placeholder="ubah di sini — contoh: menunggu part datang, unit harus dilangsir dulu…" style="resize:vertical;font-family:inherit" oninput="perbaruiPenjagaOverride()"></textarea>
+          </div>
+
+          <!-- Sengaja tetap "mini" — lebih kecil dari Approve. Approve yang utama;
+               override hanya pelengkap. Yang mencegah salah pencet adalah
+               perbaruiPenjagaOverride() (Approve terkunci selama ada perubahan
+               belum disimpan), bukan ukuran tombol. -->
+          <button class="mini" onclick="queueOverride()">💾 Simpan Override</button>
+          <div class="sub" style="margin:6px 0 0">Override diantre & tersimpan SEBELUM approve (FIFO), jadi aman dipakai saat sinyal sulit.</div>
+        </div>
+      </div>
+
+      <!-- 📋 Riwayat override: SIAPA mengubah APA -->
+      <div id="aOvLog" class="ovLog" style="display:none"></div>
+
+      <!-- Kotak "Catatan" DIHAPUS (2 Agu 2026). Isinya hanya masuk AuditLogs.details
+           sebagai JSON dan tak pernah ditampilkan di layar mana pun — approver
+           menulis alasan penting lalu terkubur. Digantikan Judgment di panel
+           Override, yang punya kolom sendiri & tampil di dashboard. Web tak pernah
+           punya kotak ini (Approval.html mengirim notes:'' mati). -->
+      <div class="chkRow"><input type="checkbox" id="aSafety"><label>Safety Incident</label></div>
+      <label>Redo Judgment</label>
+      <select class="inp" id="aMtbf"><option value="first_time">First Time</option><option value="redo">Redo</option></select>
+      <!-- Penjagaan: Approve terkunci selama masih ada perubahan override yg belum disimpan -->
+      <div id="aOvWarn" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;border-radius:8px;padding:9px 11px;font-size:12px;font-weight:600;margin-top:8px"></div>
+      <button class="big" id="aBtnL1" onclick="queueApprove(1)">✅ Approve L1</button>
+      <button class="big" id="aBtnL2" onclick="queueApprove(2)">✅ Approve L2 (Award Poin)</button>
+      <button class="big secondary" onclick="toggleRejectSection()">❌ Reject</button>
+      <div id="aRejectSection" style="display:none;margin-top:8px">
+        <label>Alasan Reject *</label>
+        <input class="inp" id="aReason" placeholder="alasan reject wajib diisi">
+        <button class="big danger" onclick="queueReject()">🚫 Kirim Reject</button>
+      </div>
+      <button class="big secondary" onclick="closeModal('approveModal')" style="margin-top:6px">Batal</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Cek Versi -->
+  <div class="modal" id="versiModal">
+    <div class="sheet">
+      <h2>⬆️ Versi Aplikasi</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px">
+        <span class="sub" style="margin:0">Terpasang di HP ini</span>
+        <b id="vTerpasang" style="font-size:15px">-</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px">
+        <span class="sub" style="margin:0">Terbaru di server</span>
+        <b id="vServer" style="font-size:15px">mengecek…</b>
+      </div>
+      <div id="vStatus" style="border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:6px">⏳ Mengecek…</div>
+      <div class="sub" id="vCatatan" style="display:none">Operasi yang masih antre <b>tidak akan hilang</b> — antrean disimpan terpisah dari cache aplikasi.</div>
+      <button class="big" id="vBtnUpdate" style="display:none" onclick="perbaruiSekarang()">⬇️ Perbarui Sekarang</button>
+      <button class="big secondary" onclick="closeModal('versiModal')" style="margin-top:6px">Tutup</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Cancel WO -->
+  <div class="modal" id="cancelModal">
+    <div class="sheet">
+      <h2>🗑 Batalkan Work Order</h2>
+      <div class="desc" id="cxDesc">-</div>
+      <div class="err" style="margin-bottom:8px">⚠️ Jika WO sudah <b>approved</b>, poin & rupiah mekanik akan <b>di-nol-kan</b> otomatis.</div>
+      <label>Alasan pembatalan *</label>
+      <input class="inp" id="cxReason" placeholder="alasan wajib diisi">
+      <button class="big danger" onclick="queueCancel()">🚫 Batalkan WO</button>
+      <button class="big secondary" onclick="closeModal('cancelModal')">Kembali</button>
+    </div>
+  </div>
+
+  <!-- MODAL: panduan instal iPhone/iPad (iOS tak punya prompt instal otomatis) -->
+  <div class="modal" id="iosModal">
+    <div class="sheet">
+      <h2>📲 Instal di iPhone / iPad</h2>
+      <div class="desc" style="line-height:1.9">
+        1. Buka link ini di <b>Safari</b><br>
+        2. Tap tombol <b>Bagikan</b> <span style="border:1px solid var(--border);border-radius:6px;padding:1px 7px">⬆️</span> di bawah layar<br>
+        3. Scroll → pilih <b>"Tambahkan ke Layar Utama"</b> (Add to Home Screen)<br>
+        4. Tap <b>Tambah</b> — ikon <b>MAR Mekanik</b> muncul di layar utama
+      </div>
+      <div class="sub">Dari Chrome iPhone: tombol Bagikan → Add to Home Screen (sama).</div>
+      <button class="big secondary" onclick="closeModal('iosModal')">Tutup</button>
+    </div>
+  </div>
+
+  <!-- FLOATING BOTTOM ACTION BAR: Bulk Approval -->
+  <div id="bulkFloatingBar" class="bulk-floating-bar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="bulk-badge-pill" id="bulkSelectedBadge">0 WO dipilih</span>
+      <button type="button" class="btn-bulk-cancel" onclick="clearSelectedWos()">Batal</button>
+    </div>
+    <button type="button" class="btn-bulk-action" id="btnBulkApproveTrigger" onclick="openBulkApproveModal()">
+      ✓ Approve Terpilih (<span id="bulkApproveCountText">0</span>)
+    </button>
+  </div>
+
+  <!-- MODAL: Bulk Approve Confirmation (Interactive Option 2) -->
+  <div class="modal" id="bulkConfirmModal">
+    <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2 id="bulkConfirmTitle" style="margin:0;font-size:16px">✓ Konfirmasi Bulk Approval</h2>
+        <button type="button" class="mini gray" onclick="closeModal('bulkConfirmModal')" style="margin:0;padding:4px 8px">✕</button>
+      </div>
+      <div class="desc" style="margin-bottom:10px">
+        Anda akan mengesahkan <strong id="bulkConfirmDescCount">0</strong> Work Order secara berurutan. Atur parameter khusus (Safety / Redo) per-WO bila diperlukan.
+      </div>
+
+      <!-- Catatan Global -->
+      <div class="fbox opsional" style="margin-bottom:10px">
+        <label>Catatan / Feedback (opsional, untuk semua WO yang disetujui)</label>
+        <textarea class="inp" id="bulkGlobalNotes" rows="2" placeholder="Tulis catatan approval (opsional)..." style="resize:vertical;font-family:inherit;margin:0"></textarea>
+      </div>
+
+      <!-- Tabel / List Interaktif Penyesuaian Per-WO -->
+      <div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:6px">
+        Daftar Penyesuaian Per-WO:
+      </div>
+      <div class="bulk-table-wrap">
+        <table class="bulk-table">
+          <thead>
+            <tr>
+              <th>WO &amp; Unit / Tipe Pekerjaan</th>
+              <th style="text-align:center;width:60px">Level</th>
+              <th style="text-align:center;width:100px" title="Menandai adanya insiden K3 (pada Level 2 akan memicu pinalti nilai poin = 0)">⚠️ Safety?</th>
+              <th style="text-align:center;width:90px" title="Menandai pekerjaan berulang / komplain garansi (menerapkan faktor pinalti MTBF)">🔧 Redo?</th>
+            </tr>
+          </thead>
+          <tbody id="bulkTableBody">
+            <!-- Diisi secara dinamis -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Dynamic Risk Warning Banner -->
+      <div id="bulkRiskBanner" style="display:none;margin-bottom:10px;padding:9px 12px;border-radius:8px;font-size:12px;line-height:1.5"></div>
+
+      <div class="sub" style="margin:0 0 10px;font-size:11px;color:var(--text-secondary)">
+        💡 <i>Eksekusi dilakukan secara sekuensial (satu per satu) dengan validasi kunci server &amp; pencatatan audit.</i>
+      </div>
+
+      <!-- Tombol Aksi Modal & Ringkasan -->
+      <div style="font-size:12px;color:var(--text-secondary);font-weight:700;margin:6px 0 8px;text-align:center">
+        [ <span id="bulkConfirmFooterSummary">0 WO Terpilih</span> ] Siap disahkan
+      </div>
+      <div style="display:flex;gap:8px;margin-top:auto">
+        <button type="button" class="big secondary" style="flex:1;margin:0" onclick="closeModal('bulkConfirmModal')">Batal</button>
+        <button type="button" class="big" id="btnStartBulkProcess" style="flex:2;margin:0;background:#10b981" onclick="startBulkApprovalQueue()">
+          ✓ Mulai Sahkan (<span id="bulkConfirmCountBtn">0</span>) WO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Bulk Approve Sequential Progress -->
+  <div class="modal" id="bulkProgressModal">
+    <div class="sheet" style="max-height:92vh;display:flex;flex-direction:column">
+      <h2 style="margin-bottom:4px">⏳ Memproses Approve Massal</h2>
+      
+      <!-- Banner Bisa Ditinggal di Background -->
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.4;margin:6px 0 8px">
+        💡 <b>Bisa ditinggal:</b> Semua WO telah masuk antrean PWA (Outbox). Anda bisa menutup modal ini, berpindah aplikasi, atau mengunci HP — proses tetap berjalan di background secara otomatis.
+      </div>
+
+      <div id="bulkProgressStatusText" style="font-weight:700;color:var(--text);font-size:13px;margin:2px 0 6px">
+        Menyiapkan antrean outbox...
+      </div>
+
+      <!-- Progress Bar -->
+      <div style="width:100%;height:10px;background:var(--bg-secondary);border-radius:99px;overflow:hidden;margin:4px 0 10px;border:1px solid var(--border)">
+        <div id="bulkProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,#F59E0B,#10B981);transition:width 0.3s ease;border-radius:99px"></div>
+      </div>
+
+      <!-- Live Log Container -->
+      <div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">
+        Riwayat Eksekusi Real-time:
+      </div>
+      <div id="bulkLogBox" class="bulk-log-box" style="flex:1;min-height:160px;max-height:240px;overflow-y:auto;margin-bottom:12px">
+        <!-- Log dinamis -->
+      </div>
+
+      <!-- Tombol Aksi Modal Progress -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:auto">
+        <div style="display:flex;gap:8px">
+          <button type="button" class="big secondary" id="btnBulkLeaveBackground" onclick="leaveBulkToBackground()" style="flex:1;margin:0;font-size:12.5px;padding:10px 6px">
+            📲 Jalankan di Background
+          </button>
+          <button type="button" class="big danger" id="btnBulkStopQueue" onclick="stopBulkQueue()" style="flex:1;margin:0;font-size:12.5px;padding:10px 6px">
+            ⏹ Batalkan Sisa
+          </button>
+        </div>
+        <button type="button" class="big" id="btnBulkDoneClose" onclick="finishBulkApproval()" style="margin:0;display:none;background:#10b981">
+          ✓ Selesai &amp; Refresh Data
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

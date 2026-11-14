@@ -59,18 +59,19 @@ function getSaklarStub(env) {
   }
 }
 
+// Fungsi ping Supabase kamar dari profilnya (<rpc>_ping). Kamar "GAS asli di Worker" (profil punya bagian gas)
+// tidak punya fungsi ping di Supabase: ia dikenali lewat GAS-nya, yaitu Worker rumah itu.
 function rpcPingUntukRumah(kode) {
-  const k = String(kode || '').toLowerCase();
-  if (k === 'sum') return 'sum_ping';
-  if (k === 'kmbtra' || k === 'kmb') return 'kmbtra_ping';
-  return 'kmb_ping';
+  const p = PROFIL_RUMAH[String(kode || '').toLowerCase()];
+  if (!p || p.gas) return null;
+  return `${p.rpc}_ping`;
 }
 
 async function tanyaSupabasePing(rumah, token, env) {
-  if (!env || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+  const rpcName = rpcPingUntukRumah(rumah.kode);
+  if (!rpcName || !env || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
     return { rumah, lewati: true };
   }
-  const rpcName = rpcPingUntukRumah(rumah.kode);
   try {
     const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${rpcName}`, {
       method: 'POST',

@@ -1,6 +1,6 @@
 # Rumah KMB Projek BUPR: Worker `abadiops-kmbbupr`
 
-Rumah: `kmbbupr` · Tahap: staging saja (produksi belum pernah di-deploy) · Saklar: belum ada di `RUMAH` pintu
+Rumah: `kmbbupr` · Tahap: staging saja (produksi belum pernah di-deploy) · Saklar: ada di `RUMAH` pintu staging
 
 Worker ini **menjalankan kode GAS BUPR yang asli** di atas cermin Supabase (keputusan Gabriel 14 Nov 2026, `docs/KEPUTUSAN.md`). Logika bisnisnya tidak ditulis ulang: yang diganti hanya "lantainya", dari Google Sheets ke Supabase. Karena kodenya sama, jawabannya 1:1 dengan GAS.
 
@@ -11,11 +11,18 @@ PWA / web ──POST {token, action, op_id, data}──▶ abadiops-kmbbupr (Wor
    └─ aksi lain ──▶ web app GAS BUPR (/exec), bila lingkungan ini punya GAS_URL
 ```
 
+## Mencoba dari HP (staging)
+
+Buka pintu staging (`abadiops-pintu-staging…/`), masukkan token BUPR, lalu pilih **Aplikasi**. Atau langsung buka Worker staging di akarnya. PWA-nya `pwa/kmbbupr`: salinan 1:1 `kawanabadigrup/PWA-Project-KMB2` (`ba4d81d`); hanya alamat API (`app.js` `CONFIG.API_URL`, `sw.js` `API_URL`) yang diganti `./api`. Datanya cermin `kmbbupr` di Gedung 2 (salinan produksi), jadi apa pun yang dilakukan di sini tidak menyentuh spreadsheet produksi. **Web Biasa** masih menampilkan pemberitahuan sampai MAR Web asli dipindah.
+
+Pintu staging mengenali token BUPR lewat GAS tiruan, yang meneruskan `/kmbbupr` ke Worker ini (ikatan `RUMAH_KMBBUPR`). Kamar "GAS asli di Worker" tidak ditanya ke fungsi ping Supabase.
+
 ## Isi
 
 | Berkas | Isinya |
 |---|---|
-| `src/index.js` | Rute API, pilihan jalur (Worker atau GAS), dan penolakan "gagal tertutup" |
+| `src/index.js` | Rute API (`./api`), file PWA, `/web` sementara, pilihan jalur (Worker atau GAS), dan penolakan "gagal tertutup" |
+| `../../pwa/kmbbupr/` | PWA BUPR (salinan 1:1, hanya alamat API diganti) |
 | `gas/gas-kamar.js` | Kode GAS BUPR yang dibungkus. **Tidak ada di repo** (repo publik); dibuat ulang sebelum deploy |
 | `../bersama/gas-layanan.js` | Layanan Google tiruan (`SpreadsheetApp`, `Date` berzona skrip, `Utilities`, …), dipakai juga `tools/kembar` |
 | `../bersama/gas-host.js` | Hash, UUID, dan base64 sinkron untuk `Utilities` (butuh `nodejs_compat`) |

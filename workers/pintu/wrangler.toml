@@ -67,4 +67,5 @@ RUMAH = [
   { kode = "kmbprojek", nama = "KMB Projek (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbprojek", alamat = "https://abadiops-kmbprojek-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-kmbprojek-staging.kawanabadigrup.workers.dev/web" },
   { kode = "sum", nama = "SUM (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/sum", alamat = "https://abadiops-sum-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-sum-staging.kawanabadigrup.workers.dev/web" },
   { kode = "kmbtra", nama = "KMB TRA (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbtra", alamat = "https://abadiops-kmb-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-kmb-staging.kawanabadigrup.workers.dev/web" },
+  { kode = "kmbbupr", nama = "KMB Projek BUPR (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbbupr", alamat = "https://abadiops-kmbbupr-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-kmbbupr-staging.kawanabadigrup.workers.dev/web" },
 ]

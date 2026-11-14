@@ -20,6 +20,14 @@ services = [
   { binding = "PINTU", service = "abadiops-pintu" }
 ]
 
+# File PWA BUPR: salinan 1:1 kawanabadigrup/PWA-Project-KMB2 (ba4d81d, 5 Nov 2026); hanya alamat API diganti ./api.
+# html_handling "none": /index.html disajikan langsung (200, tanpa redirect).
+[assets]
+directory = "../../pwa/kmbbupr"
+binding = "ASSETS"
+html_handling = "none"
+not_found_handling = "none"
+
 [vars]
 RUMAH = "kmbbupr"
 # Web app GAS produksi BUPR (deployment yang dipakai PWA BUPR).
