@@ -1,3 +1,8 @@
+-- !! JANGAN DIJALANKAN ULANG UTUH (14 Nov 2026, BUG-DICATAT #39). Bagian admin di berkas ini (pemicu
+-- *_pertahankan_admin_*, tabel admin_*_supabase, fungsi public.(sum|kmbtra|kmb)_admin_*, _*_validasi_admin_token,
+-- _cek_is_admin) merusak cermin dan membuka token; sudah dibuang dari Gedung 2 dengan
+-- db/bersama/hapus_admin_lama.sql dan diganti pusat admin di atas cermin (workers/pintu/src/admin-cermin.js).
+-- Menjalankan ulang berkas ini memasang semuanya lagi.
 -- ==============================================================================
 -- BACKEND PENUH MANDIRI SUPABASE (BACA + TULIS + DESKTOP WEB) — SKEMA `kmb_projek`
 -- Rumah: kmbprojek · Pemegang: Raka · Tanpa Ketergantungan Pihak Ketiga (GAS)

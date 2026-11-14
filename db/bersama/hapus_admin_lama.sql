@@ -31,7 +31,7 @@ BEGIN
     SELECT p.oid::regprocedure
       FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE (n.nspname = 'public' AND p.proname ~ '^_?(sum|kmbtra|kmb)_(admin_|validasi_admin_token)')
-        OR (n.nspname = 'sum' AND p.proname = '_cek_is_admin')
+        OR (n.nspname IN ('sum', 'kmb', 'kmb_projek') AND p.proname = '_cek_is_admin')
   LOOP
     EXECUTE 'DROP FUNCTION ' || f;
   END LOOP;
