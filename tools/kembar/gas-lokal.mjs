@@ -100,7 +100,7 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
       const gagal = [];
       for (const i of antre) {
         try { skrip[i].runInContext(ctx); jadi.push(i); } catch (e) {
-          if (!(e && e.name === 'ReferenceError')) throw new Error(`${kode.berkas[i].nama} gagal dimuat: ${e && e.message}`);
+          if (!(e && e.name === 'ReferenceError')) { const g = new Error(`${kode.berkas[i].nama} gagal dimuat: ${e && e.message}`); g.cause = e; throw g; }
           gagal.push({ i, pesan: e.message });
         }
       }
@@ -120,13 +120,16 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
 
 // sesi: perubahan setiap panggilan diterapkan ke data di memori (tidak pernah ke database), jadi urutan aksi
 // seperti buat WO → kirim kerja → approve bisa dijalankan berurutan.
-export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [], sesi = false, urlWeb = '' }) {
+// penggunaAktif dan pemicu hanya untuk uji: meniru eksekusi dari editor (email pengguna aktif) dan pemicu terpasang.
+// cermin: isi cermin yang sudah dimuat (misalnya untuk membandingkan dua versi kode di atas data yang sama).
+export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [], sesi = false, urlWeb = '', penggunaAktif = '', pemicu = [], cermin = null }) {
   // Sama dengan Worker: mesin UTC, zona skrip dibawa Date tiruan.
   process.env.TZ = 'UTC';
   const kode = bacaKodeGas(folderGas);
-  const cermin = await muatCermin(sql, skema, tidakDimuat);
-  const data = dataDariCermin(cermin, kode.zonaSkrip);
+  const data = dataDariCermin(cermin || await muatCermin(sql, skema, tidakDimuat), kode.zonaSkrip);
   if (urlWeb) data.urlWeb = urlWeb;
+  if (penggunaAktif) data.penggunaAktif = penggunaAktif;
+  if (pemicu.length) data.pemicu = pemicu;
   const k = siapkanKonteks({ kode, data, ketat });
   return {
     berkas: kode.berkas.length,

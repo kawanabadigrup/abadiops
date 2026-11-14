@@ -12,6 +12,21 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · kmbtra, sum, kmbprojek, kmbbupr (celah `google.script.run` di keempat GAS produksi ditutup)
+- Berubah:
+  - **Produksi GAS:** penjaga `google.script.run` terpasang di keempat script (BUG-DICATAT #37, KEPUTUSAN 14 Nov): **BUPR @11, KMB Project @49, KMB V2 @299, SUM V2 @199**. Claude `clasp push`, Gabriel Deploy dari editor.
+  - `tools/kembar/analisis-gas.mjs` (baru): `fungsiPublik` (fungsi global yang tidak diakhiri `_`, termasuk yang berawalan `_`) dan `pemanggilGoogleScriptRun` (fungsi yang benar-benar dipanggil halaman lewat `google.script.run`).
+  - `tools/kembar/tambal-penjaga.mjs` (baru): menyisipkan penjaga di salinan kode GAS (folder di luar repo) dan menambah `_PenjagaRun.js`. Fungsi yang dipanggil saat script dimuat dicari dengan memuat hasilnya di GAS lokal lalu dikecualikan otomatis.
+  - `tools/kembar/cek-cakupan-penjaga.mjs` (baru): mencocokkan kode tertambal dengan daftar `functionNames` yang dicantumkan GAS di halaman `/exec`. Itulah daftar resmi fungsi yang bisa dipanggil `google.script.run`.
+  - `tools/kembar/bundel-gas.mjs`: daftar izin MAR Web memakai `pemanggilGoogleScriptRun` (BUPR 56 → 24). Worker kmbbupr staging di-deploy ulang; `createTokenForUser`, `generateMissingTokens`, `setupSpreadsheet` kini ditolak.
+  - `tools/kembar/gas-lokal.mjs` dan `workers/bersama/gas-layanan.js`: opsi `penggunaAktif` (Session.getActiveUser), `pemicu` (ScriptApp.getProjectTriggers), dan `cermin` (data sudah dimuat) untuk menguji penjaga; galat saat muat membawa `cause`.
+  - **Uji (GAS lokal, kode asli vs tertambal, data cermin yang sama; tiga rumah memakai cermin Gedung 1 hanya-baca):** BUPR 307/0, KMB Project 232/0, KMB V2 208/0, SUM V2 250/0; fungsi pemicu 6/6, 6/6, 5/5, 4/4. Sesudah deploy: isi versi tayang = tambalan, halaman dan ping sama dengan sebelum deploy, `functionNames` tayang 0 celah.
+- Belum selesai / berikutnya:
+  - BUG #38 (`getWODetails` tanpa token, SUM `reportExpiredWO`) menunggu keputusan Gabriel.
+  - Cek Script Properties KMB Project dan BUPR: kalau `SUPABASE_KEY` berisi kunci rahasia, ganti (bisa terbaca lewat `_getSupabaseConfig` sebelum ditambal), dan pastikan `SUPABASE_URL` tidak diubah orang.
+  - Setiap perubahan GAS berikutnya: jalankan ulang `tambal-penjaga.mjs` dan `cek-cakupan-penjaga.mjs` sebelum push. Salinan lokal lama (MAR-project, MAR-PROJEK-KMB, dst.) belum berisi penjaga; `clasp pull` dulu sebelum menyunting.
+  - `config/rumah.json` kmbbupr masih mematok GAS @9; naikkan ke @11 supaya Worker menjalankan kode yang sama dengan produksi (bundel ulang + uji ulang).
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (MAR Web asli BUPR di Worker)
 - Berubah:
   - **MAR Web BUPR = halaman web GAS yang asli**, dijalankan di Worker staging: `GET /web` (doGet + template HtmlService) dan `POST /web/run` (`google.script.run`). Tidak ada halaman yang ditulis ulang.

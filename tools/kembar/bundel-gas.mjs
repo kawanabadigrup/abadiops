@@ -16,9 +16,10 @@
  *   gasKamar(L)  memasang layanan tiruan L (workers/bersama/gas-layanan.js) sebagai nama global kode GAS,
  *             menjalankan semua berkas menurut urutan muat, memasang template web yang sudah dikompilasi
  *             (tools/kembar/templat-gas.mjs), lalu mengembalikan { doPost, doGet, fungsiWeb }.
- * fungsiWeb adalah DAFTAR IZIN google.script.run: hanya fungsi publik yang disebut di berkas HTML (dipanggil
- * langsung atau lewat namanya). Di GAS semua fungsi tanpa akhiran _ bisa dipanggil google.script.run, termasuk
- * alat perawatan yang tidak pernah dipakai halaman; Worker tidak meniru celah itu.
+ * fungsiWeb adalah DAFTAR IZIN google.script.run: hanya fungsi yang benar-benar dipanggil halaman lewat
+ * google.script.run (tools/kembar/analisis-gas.mjs pemanggilGoogleScriptRun). Di GAS semua fungsi tanpa akhiran _
+ * bisa dipanggil google.script.run, termasuk alat perawatan yang tidak pernah dipakai halaman; Worker tidak meniru
+ * celah itu.
  * Kode berjalan dalam mode ketat (modul ES); uji kembar (tools/kembar/gas-lokal.mjs) memakai mode yang sama.
  */
 import fs from 'node:fs';
@@ -30,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { bacaKodeGas, siapkanKonteks } from './gas-lokal.mjs';
 import { NAMA_LAYANAN } from '../../workers/bersama/gas-layanan.js';
 import { kompilasiFolder, kodePasangTemplat } from './templat-gas.mjs';
+import { fungsiPublik, pemanggilGoogleScriptRun } from './analisis-gas.mjs';
 
 const AKAR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => {
@@ -55,13 +57,10 @@ const isi = new Map(kode.berkas.map((b) => [b.nama, b.isi]));
 const sidik = crypto.createHash('sha256');
 for (const nama of urutan) sidik.update(nama + '\n' + isi.get(nama) + '\n');
 
-// Template web dan daftar izin google.script.run (fungsi publik yang disebut di HTML).
+// Template web dan daftar izin google.script.run (fungsi yang dipanggil halaman lewat google.script.run).
 const web = kompilasiFolder(kode.html);
 for (const b of kode.html) sidik.update(b.nama + '\n' + b.isi + '\n');
-const fungsiPublik = new Set();
-for (const b of kode.berkas) for (const m of b.isi.matchAll(/^function ([A-Za-z$][\w$]*)\s*\(/gm)) if (!m[1].endsWith('_')) fungsiPublik.add(m[1]);
-const kataHtml = new Set(kode.html.flatMap((b) => b.isi.match(/[A-Za-z_$][\w$]*/g) || []));
-const fungsiWeb = [...fungsiPublik].filter((n) => kataHtml.has(n)).sort();
+const fungsiWeb = pemanggilGoogleScriptRun(kode.html, fungsiPublik(kode.berkas));
 
 const INFO = {
   kamar: arg.kamar, script: profil.gas.script, versi: profil.gas.versi, berkas: urutan.length,

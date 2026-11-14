@@ -7,12 +7,26 @@ Alat untuk menjalankan kode GAS ASLI sebuah rumah di luar Google, di atas cermin
 | `gas-lokal.mjs` | Menjalankan kode GAS rumah di komputer kerja sebagai pembanding uji kembar. Tidak memanggil `/exec`, tidak memakai token di Google, dan tidak menulis ke spreadsheet. Kondisinya sama dengan Worker: mode ketat dan zona mesin UTC |
 | `templat-gas.mjs` | Mengompilasi template HtmlService (`<? ?>`, `<?= ?>`, `<?!= ?>`) menjadi fungsi JS biasa tanpa `eval`/`with`, dengan escaping `<?= ?>` menurut konteks. Dipakai bundel Worker dan GAS lokal (`web()`, `jalankan()`) |
 | `bundel-gas.mjs` | Membungkus kode GAS versi yang dipatok di `config/rumah.json` menjadi `workers/<kamar>/gas/gas-kamar.js` untuk Worker rumah. Hasilnya tidak di-commit |
+| `analisis-gas.mjs` | `fungsiPublik` (fungsi global GAS yang bisa dipanggil `google.script.run`: semua yang tidak **diakhiri** `_`, termasuk yang **diawali** `_`) dan `pemanggilGoogleScriptRun` (fungsi yang benar-benar dipanggil halaman). Dipakai daftar izin MAR Web Worker dan alat tambal |
+| `tambal-penjaga.mjs` | Memasang penjaga `google.script.run` di salinan kode GAS (BUG-DICATAT #37): titik masuk sah ditandai, fungsi publik lain menolak panggilan langsung. Hanya mengubah folder salinan; push ke Google dikerjakan terpisah |
+| `cek-cakupan-penjaga.mjs` | Mencocokkan kode tertambal dengan daftar `functionNames` yang dicantumkan GAS sendiri di halaman `/exec`. Harus 0 celah sebelum dan sesudah deploy |
 
-Keduanya memakai layanan Google tiruan yang sama dengan Worker (`workers/bersama/gas-layanan.js`) dan data yang sama (`public.cermin_baca`, `db/bersama/cermin_baca.sql`).
+Semuanya memakai layanan Google tiruan yang sama dengan Worker (`workers/bersama/gas-layanan.js`) dan data yang sama (`public.cermin_baca`, `db/bersama/cermin_baca.sql`).
 
 ## Mengambil kode GAS
 
-Kode GAS diambil dengan `clasp clone <scriptId> [versi]` ke folder **di luar repo**, karena repo ini publik. Hanya `clone`; `clasp push` dan `clasp deploy` tidak pernah dijalankan alat ini.
+Kode GAS diambil dengan `clasp clone <scriptId> [versi]` ke folder **di luar repo**, karena repo ini publik. Alat di sini tidak pernah menjalankan `clasp push` atau `clasp deploy`.
+
+## Penjaga `google.script.run` (sejak 14 Nov 2026)
+
+Keempat GAS produksi memakai penjaga (`_PenjagaRun.js`). **Fungsi publik baru tidak otomatis dijaga.** Setiap kali kode GAS berubah:
+
+1. `clasp pull` (atau clone) dulu. Salinan lokal lama belum berisi penjaga, dan push dari situ menghapusnya.
+2. Sunting, lalu jalankan `node tools/kembar/tambal-penjaga.mjs --gas=<folder>`. Alatnya idempoten: fungsi yang sudah bertanda dilewati. Fungsi yang dipanggil saat script dimuat dikecualikan otomatis dan disebut di keluarannya; periksa bahwa itu memang bukan fungsi data.
+3. Fungsi baru yang dipanggil halaman lewat `google.script.run` otomatis menjadi titik masuk, asalkan namanya muncul di HTML (`google.script.run.namaFungsi(…)` atau teks `'namaFungsi'`).
+4. Sesudah deploy, unduh halaman `/exec` dan jalankan `cek-cakupan-penjaga.mjs`; hasilnya harus `CELAH 0`.
+
+Jangan `clasp deploy`. Deploy lewat editor (Manage deployments → pensil → New version) sebagai akun yang sama dengan "Execute as" sekarang.
 
 ## Yang perlu diketahui saat menambah rumah
 

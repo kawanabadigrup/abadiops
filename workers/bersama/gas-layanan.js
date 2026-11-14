@@ -439,7 +439,8 @@ export function buatLayanan(D, host) {
   // Eksekusi PWA berjalan sebagai deployer dengan pengguna anonim; identitas selalu dari token.
   var Session = tanpaDikenal('Session', {
     getScriptTimeZone: function () { return ZONA; },
-    getActiveUser: function () { catatSekali(CATAT.layanan, 'Session.getActiveUser'); return { getEmail: function () { return ''; } }; },
+    // Pemanggil PWA/web anonim: email kosong. D.penggunaAktif hanya untuk uji (meniru editor atau menu).
+    getActiveUser: function () { catatSekali(CATAT.layanan, 'Session.getActiveUser'); return { getEmail: function () { return D.penggunaAktif || ''; } }; },
     getEffectiveUser: function () { catatSekali(CATAT.layanan, 'Session.getEffectiveUser'); return { getEmail: function () { return ''; } }; },
     getTemporaryActiveUserKey: function () { return ''; },
   });
@@ -636,7 +637,12 @@ export function buatLayanan(D, host) {
     ScriptApp: tanpaDikenal('ScriptApp', {
       // Alamat web app = alamat web Worker yang sedang melayani (D.urlWeb), supaya tautan antarhalaman tetap di sini.
       getService: function () { return { getUrl: function () { return D.urlWeb || 'https://script.google.com/macros/s/GAS-LOKAL/exec'; } }; },
-      getProjectTriggers: function () { return []; },
+      // D.pemicu hanya untuk uji: [{ uid, fungsi }] meniru pemicu terpasang.
+      getProjectTriggers: function () {
+        return (D.pemicu || []).map(function (p) {
+          return { getUniqueId: function () { return String(p.uid); }, getHandlerFunction: function () { return p.fungsi; }, getEventType: function () { return 'CLOCK'; } };
+        });
+      },
       newTrigger: function () { catatSekali(CATAT.layanan, 'ScriptApp.newTrigger'); return tanpaDikenal('TriggerBuilder', {}); },
       deleteTrigger: function () { catatSekali(CATAT.layanan, 'ScriptApp.deleteTrigger'); },
       getOAuthToken: function () { catatSekali(CATAT.layanan, 'ScriptApp.getOAuthToken'); throw new Error('GAS lokal: getOAuthToken tidak tersedia'); },
