@@ -24,7 +24,7 @@ Formatnya:
   - Pintu: `compatibility_flags = ["nodejs_compat"]`. Pintu staging `4135b207`.
   - **Uji pintu staging:** BUPR semua fungsi tulis 37/37, termasuk token terbitan pusat admin langsung bisa masuk lewat Worker GAS asli dan token yang diganti/dicabut ditolak; bentuk cermin tetap rapi; SUM dan KMB TRA terbaca; KMB Projek menjawab "belum ada cermin" (skema staging masih tabel Raka). Data staging BUPR dikembalikan ke isi spreadsheet.
 - Belum selesai / berikutnya:
-  - Gedung 2 sudah dibersihkan dari admin lama (izin Gabriel 14 Nov). Menunggu izin: sinkron ulang `Config_Mechanics` dan `ApiTokens` SUM/KMB TRA staging (baris rusak), lalu uji tulis pusat admin di SUM dan KMB TRA.
+  - Gedung 2 sudah dibersihkan dari admin lama dan cermin SUM/KMB TRA staging disinkron ulang (izin Gabriel 14 Nov). Uji tulis pusat admin: BUPR 37/37, SUM 29/29, KMB TRA 29/29. Data uji dikembalikan ke isi spreadsheet.
   - KMB Projek staging pindah ke GAS asli (keputusan Gabriel 14 Nov): cadangkan skema Raka, buat cermin, Worker KMB Projek menjalankan GAS @49.
 
 ### 2026-11-14 · Gabriel (+ Claude) · kmbtra, sum, kmbprojek, kmbbupr (celah `google.script.run` di keempat GAS produksi ditutup)
