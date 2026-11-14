@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 .env.*
+# Rahasia Worker untuk wrangler dev (kunci Supabase dsb.)
+.dev.vars*
 # Templat BOLEH ikut — isinya tempat isian, dan tanpanya `cp
 # .env.produksi.example .env.produksi` di PENERAPAN.md menyalin berkas yang
 # tidak ada. `!.env.example` saja tidak cukup: ia tidak mengenai
