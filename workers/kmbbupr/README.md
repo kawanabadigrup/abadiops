@@ -56,7 +56,8 @@ Worker tidak pernah mengirim jawaban yang mungkin salah. Aksinya dijawab dengan 
 
 - **Template dikompilasi saat bundel** (`tools/kembar/templat-gas.mjs`), karena Worker tidak mengizinkan `eval` dan selalu mode ketat (tanpa `with`). Properti template dan nama global GAS dipetakan ke variabel scriptlet; `<?= ?>` di-escape menurut konteksnya (teks HTML, atribut, awal/tengah URL, atribut event, string JS).
 - **`google.script` disisipkan** ke awal `<head>` (`../bersama/gas-web.js`): `run` (dengan `withSuccessHandler`, `withFailureHandler`, `withUserObject`), `url.getLocation`, `host`, `history`. Tautan antarhalaman memakai `ScriptApp.getService().getUrl()`, yang di sini adalah alamat `/web` Worker.
-- **Daftar izin `google.script.run`**: hanya fungsi publik yang disebut di berkas HTML (`INFO.fungsiWeb`, dihitung saat bundel; BUPR @9: 56 fungsi). Fungsi lain, termasuk alat perawatan, dijawab "Script function not found".
+- **Daftar izin `google.script.run`**: hanya fungsi yang benar-benar dipanggil halaman lewat `google.script.run` (`INFO.fungsiWeb`, dihitung saat bundel dengan `tools/kembar/analisis-gas.mjs`; BUPR @11: 24 fungsi, himpunan yang sama dengan titik masuk penjaga GAS, BUG-DICATAT #37). Fungsi lain, termasuk alat perawatan, dijawab "Script function not found".
+- **Penjaga GAS ikut jalan di Worker** (GAS @11 berisi `_PenjagaRun.js`): `doPost`, `doGet`, dan ke-24 fungsi itu adalah titik masuk sah, jadi fungsi di dalamnya lolos; eksekusi Worker selalu dimulai dari salah satunya.
 - Nilai balik yang memuat `Date` diterima peramban sebagai `null` (aturan `google.script.run`). Tulisan disimpan lewat `cermin_tulis` seperti aksi tulis API; seperti di GAS, tulisan tetap disimpan walaupun fungsi lalu melempar galat.
 - Disajikan hanya bila Supabase sumber datanya (saklar `supabase` atau tanpa GAS); selain itu `/web` diarahkan ke web app GAS. Jawaban `Cache-Control: no-store` dan `Referrer-Policy: no-referrer`, karena halaman memuat token.
 

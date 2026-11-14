@@ -21,11 +21,12 @@ Formatnya:
   - `tools/kembar/bundel-gas.mjs`: daftar izin MAR Web memakai `pemanggilGoogleScriptRun` (BUPR 56 → 24). Worker kmbbupr staging di-deploy ulang; `createTokenForUser`, `generateMissingTokens`, `setupSpreadsheet` kini ditolak.
   - `tools/kembar/gas-lokal.mjs` dan `workers/bersama/gas-layanan.js`: opsi `penggunaAktif` (Session.getActiveUser), `pemicu` (ScriptApp.getProjectTriggers), dan `cermin` (data sudah dimuat) untuk menguji penjaga; galat saat muat membawa `cause`.
   - **Uji (GAS lokal, kode asli vs tertambal, data cermin yang sama; tiga rumah memakai cermin Gedung 1 hanya-baca):** BUPR 307/0, KMB Project 232/0, KMB V2 208/0, SUM V2 250/0; fungsi pemicu 6/6, 6/6, 5/5, 4/4. Sesudah deploy: isi versi tayang = tambalan, halaman dan ping sama dengan sebelum deploy, `functionNames` tayang 0 celah.
+  - **Worker BUPR staging menjalankan GAS @11** (sama dengan produksi): `config/rumah.json` kmbbupr `gas.versi` 9 → 11, bundel ulang (106 berkas, termasuk `_PenjagaRun.js`), Worker staging `35af2234`. Uji ulang terhadap GAS lokal @11: bundel 60/60, baca 66/66, halaman 36/36, skenario tulis 13/13 + 24 sheet, approve L1/L2 lewat web 4/4 + 24 sheet; fungsi di luar daftar izin tetap ditolak. Data staging BUPR dikembalikan ke isi spreadsheet sesudahnya.
 - Belum selesai / berikutnya:
   - BUG #38 (`getWODetails` tanpa token, SUM `reportExpiredWO`) menunggu keputusan Gabriel.
   - Cek Script Properties KMB Project dan BUPR: kalau `SUPABASE_KEY` berisi kunci rahasia, ganti (bisa terbaca lewat `_getSupabaseConfig` sebelum ditambal), dan pastikan `SUPABASE_URL` tidak diubah orang.
-  - Setiap perubahan GAS berikutnya: jalankan ulang `tambal-penjaga.mjs` dan `cek-cakupan-penjaga.mjs` sebelum push. Salinan lokal lama (MAR-project, MAR-PROJEK-KMB, dst.) belum berisi penjaga; `clasp pull` dulu sebelum menyunting.
-  - `config/rumah.json` kmbbupr masih mematok GAS @9; naikkan ke @11 supaya Worker menjalankan kode yang sama dengan produksi (bundel ulang + uji ulang).
+  - Setiap perubahan GAS berikutnya: jalankan ulang `tambal-penjaga.mjs` dan `cek-cakupan-penjaga.mjs` sebelum push. Salinan lokal lama (MAR-project, MAR-PROJEK-KMB, dst.) belum berisi penjaga; `clasp pull` dulu sebelum menyunting. Setiap kali versi GAS BUPR naik, naikkan juga `gas.versi` di `config/rumah.json` lalu bundel dan uji ulang.
+  - (c) Pusat admin baru (penyunting sheet config) di BUPR.
 
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (MAR Web asli BUPR di Worker)
 - Berubah:
