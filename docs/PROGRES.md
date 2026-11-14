@@ -12,6 +12,14 @@ Formatnya:
 
 ---
 
+### 2026-11-14 (malam) · Gabriel (+ Claude) · bersama, keempat rumah (paket berbayar, keputusan Tonggak 2, ruang uji Gedung 1)
+- Berubah:
+  - **Paket berbayar aktif** (dibayar Gabriel): Supabase Pro USD 25 untuk organisasi berisi `abadiops` (Gedung 1; mesin Nano → Micro, restart 20.12 WIB, sinkron cermin berikutnya sukses) dan Cloudflare Workers Paid USD 5. Proyek Stagging dipindah ke organisasi gratis terpisah supaya tidak menambah USD 10.
+  - **Worker harus di-deploy ulang setelah upgrade Workers Paid** (BUG-DICATAT #40). Sebelum deploy ulang, Worker masih diputus di ±50 ms CPU (Workers Logs: "Worker exceeded CPU time limit"). Uji kontrol: KMB V2 yang di-deploy ulang lolos 8/8 aksi berat, SUM yang belum tetap gagal mulai permintaan ke-3. Semua Worker staging di-deploy ulang tanpa perubahan kode. Uji kembar Cloudflare tanpa jeda (masih Gedung 2): KMB Projek baca 286/286, web 27/27; KMB V2 baca 468/468, web 27/27; SUM baca 657/672, web 41/45. Sisa SUM semuanya batas waktu query 57014 di mesin Nano Gedung 2. Galat 1102 nol.
+  - **Keputusan Tonggak 2** (`docs/SAKLAR.md` ditulis ulang, `docs/KEPUTUSAN.md`): tiap rumah pindah sekaligus, bertahap BUPR → KMB Projek → KMB V2 → SUM; GAS ditutup penuh saat jam mulai; jalan kembali ke GAS lewat cermin balik; uji di Gedung 1, Gedung 2 tidak dipakai lagi.
+  - **Ruang uji di Gedung 1:** `cermin_baca`, `cermin_tulis` (+ kunci tulis), `cermin_admin_log`, dan `cermin_salin_ke_uji` terpasang. Salinan `uji_*` keempat rumah identik dengan cermin asli. Kunci menolak keempat skema asli (`PT423 TERKUNCI`). Worker uji (`abadiops-*-staging`) pindah ke Gedung 1 dengan `SKEMA_AWALAN = "uji_"` dan kunci rahasia khusus `worker_uji`; saklar uji keempat rumah `supabase`.
+- Belum selesai / berikutnya: hasil uji kembar lengkap di ruang uji (baca, web, tulis keempat rumah; sedang berjalan); langkah 2–8 rencana Tonggak 2; Worker produksi wajib di-deploy ulang sebelum saklar `supabase`.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbtra, sum, kmbprojek (langkah (d): KMB V2 dan SUM ke GAS asli di staging; muat sheet sesuai kebutuhan)
 - Berubah:
   - **Worker memuat sheet sesuai kebutuhan** (BUG #41): hanya sheet yang dibaca kode GAS, dipelajari per aksi/halaman/fungsi (gagal tertutup + ulang); AuditLogs jarang untuk tulis. Regresi BUPR identik (baca 66/66, web 36/36, tulis 13/13 + 24 sheet, approve web 4/4 + 24 sheet). Egress rata-rata aksi baca turun 62–76%.
