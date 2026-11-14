@@ -1,60 +1,85 @@
-# Saklar "WO baru ke Supabase"
+# Saklar migrasi per rumah
 
-Setiap rumah (`sum`, `kmbtra`, `kmbprojek`) punya satu saklar. Posisi bawaannya **`gas`**, artinya mati.
+Setiap rumah (`kmbbupr`, `kmbprojek`, `kmbtra`, `sum`) punya satu saklar. Posisi bawaannya **`gas`**.
 
-Tujuan saklar: memindahkan backend tanpa memindahkan WO yang sedang berjalan. WO lama diselesaikan di GAS, WO baru lahir di Supabase.
+> **Rancangan 14 Nov 2026 (keputusan Gabriel)** menggantikan rancangan `dua_cabang` 29 Okt, yang menyelesaikan WO lama di GAS sambil melahirkan WO baru di Supabase. Alasannya ada di `docs/KEPUTUSAN.md` (14 Nov). Singkatnya, jalur Supabase menjalankan kode GAS asli di atas data yang sama, jadi WO yang sedang berjalan bisa langsung dilanjutkan tanpa GAS. Sebaliknya, dua penulis pada sheet yang sama merusak cermin per baris.
 
-## Tiga posisi saklar
+## Dua tonggak
 
-| Posisi | WO baru dibuat di | Aksi pada WO lama (lahir di GAS) | Aksi pada WO baru (lahir di Supabase) | Daftar, monitoring, payroll dibaca dari |
+1. **Tonggak 1, mulai mirroring** (berjalan sejak 13 Nov):
+   - GAS satu-satunya penulis.
+   - Spreadsheet disalin ke Supabase Gedung 1 tiap jam.
+   - Selisih diperiksa penuh tiap malam (`.github/workflows/cermin.yml`; hasilnya di `<skema>.cermin_meta` dan `<skema>.cermin_log`).
+2. **Tonggak 2, mulai migrasi** (tombol per rumah di panel):
+   - GAS rumah itu ditutup penuh, dan Supabase menjadi satu-satunya penulis.
+   - Semua WO, termasuk yang masih pending mekanik/L1/L2, dilanjutkan di abadiops dari status terakhirnya, dengan aturan dan rumus yang sama.
+
+## Posisi saklar
+
+| Posisi | Penulis | GAS web dan API | PWA dan web abadiops | Arah cermin |
 |---|---|---|---|---|
-| `gas` (bawaan) | GAS | GAS | belum ada | GAS, atau cermin kalau aksi baca sudah dipindah |
-| `dua_cabang` | **Supabase** | GAS, sampai approved | Supabase | Supabase: WO baru asli + cermin WO lama |
-| `supabase` | Supabase | sudah habis | Supabase | Supabase. GAS tidak dipakai lagi |
+| `gas` (bawaan) | GAS | normal | diteruskan ke GAS | spreadsheet → Supabase |
+| `menutup` (beberapa menit) | tidak ada | ditutup | menunggu; HP mengantre kiriman | sinkron terakhir, lalu periksa selisih |
+| `supabase` | Supabase | ditutup, mengarahkan ke abadiops | kode GAS asli di Worker | Supabase → spreadsheet (cermin balik) |
+| `membuka` (beberapa menit) | tidak ada | ditutup | menunggu; HP mengantre kiriman | cermin balik terakhir, lalu periksa selisih |
 
-Urutannya selalu `gas`, lalu `dua_cabang`, lalu `supabase`. Posisi `supabase` baru dipasang setelah semua WO lama habis.
+- `menutup` dan `membuka` adalah posisi peralihan yang dipasang tombol, bukan pilihan manual.
+- GAS atau Worker yang gagal membaca saklar **tidak menulis apa pun**, dan meminta pengguna mencoba lagi sebentar lagi. Menolak sebentar lebih aman daripada dua penulis.
+- "GAS ditutup" berarti semua aksi ditolak dengan pesan dan link ke abadiops (login dengan token). Ini termasuk buat WO, approve, override, unduh payroll, dan laporan. Setelah jam mulai, data GAS sudah tidak lengkap, jadi laporan dari GAS akan salah.
 
-## Satu WO, satu rumah
+## Mulai migrasi (`gas` → `supabase`)
 
-- Rumah sebuah WO ditentukan saat WO itu lahir, dan tidak pernah berubah.
-- Worker mengenali rumah WO dari ID internalnya. WO yang lahir di Supabase memakai awalan ID yang berbeda dari ID buatan GAS.
-- WO tidak pernah dipindah dari GAS ke Supabase, atau sebaliknya, di tengah jalan.
+Tombol mulai hanya aktif kalau **kesehatan cermin** rumah itu hijau:
+- tidak ada selisih selama 7 hari berturut-turut (`hari_tanpa_selisih` ≥ 7);
+- sinkron terakhir berhasil, kurang dari 2 jam lalu;
+- semua syarat di bawah sudah tercentang.
 
-## Data hanya mengalir satu arah
+Yang dikerjakan tombol secara otomatis:
+1. Mencatat jam mulai dalam waktu setempat rumah itu (SUM WITA, lainnya WIB) dan menyimpannya sebagai waktu mutlak.
+2. Saklar → `menutup`. GAS dan Worker menolak tulis, dan HP mengantre kiriman.
+3. Mengambil cadangan database, lalu menjalankan sinkron terakhir dan pemeriksaan selisih penuh.
+4. Hasilnya menentukan langkah berikut:
+   - **Selisih 0:** saklar → `supabase`. Pemicu terjadwal GAS berhenti dan dijalankan Worker, cermin balik mulai, dan antrean HP terkirim ke Supabase.
+   - **Selisih bukan 0:** saklar kembali ke `gas`. Tidak ada yang hilang, karena belum ada yang ditulis di Supabase. Panel menampilkan sheet yang berbeda.
 
-Data mengalir dari spreadsheet ke Supabase sebagai cermin, tidak pernah sebaliknya.
-- Setiap kali aksi yang diteruskan ke GAS berhasil, Worker langsung menarik WO yang berubah ke cermin.
-- Selain itu ada sinkron penuh berkala, ditambah laporan selisih harian. Keduanya jalan di workflow `cermin` (`.github/workflows/cermin.yml`): sinkron tiap jam, dan pemeriksaan selisih penuh sekali sehari mulai 02.00 WIB. Hasilnya di `<skema>.cermin_meta` (`periksa_hasil`, `hari_tanpa_selisih`) dan `<skema>.cermin_log`.
-- Halaman web GAS yang dipakai supervisor di laptop menulis langsung ke spreadsheet tanpa lewat Worker. Karena itu sinkron berkala wajib, dan halaman web GAS rumah itu harus ditutup atau dibuat hanya-baca sebelum saklarnya dinyalakan.
+**Urutan rumah** belum diputuskan. Keputusan 29 Okt: serentak. Usulan 14 Nov: bertahap, BUPR → KMB Projek → KMB V2 → SUM, masing-masing dengan jam mulai sendiri. Menunggu keputusan Gabriel.
 
-## Syarat sebelum saklar sebuah rumah dinyalakan
+## Jaring pengaman: kembali ke GAS (`supabase` → `gas`)
 
-- [ ] Cermin rumah itu tidak punya selisih dengan spreadsheet selama **7 hari** berturut-turut (`hari_tanpa_selisih` minimal 7 di `<skema>.cermin_meta`).
-- [ ] Semua aksi tulis dan halaman web rumah itu sudah dipindah dan **lulus uji rekam-putar** di staging: hasil Worker sama dengan hasil GAS, kolom per kolom.
-- [ ] **Buku tamu kiriman** sudah aktif di pintu depan dan disimpan di Cloudflare, bukan di Supabase. Dengan begitu, kiriman yang dikirim ulang tidak tercatat dua kali, ke mesin mana pun.
-- [ ] Cermin ikut menyalin `ProcessedOps` dari GAS.
-- [ ] Sudah dipastikan **nomor WO tidak bisa kembar** antara GAS dan Supabase: WO Supabase memakai 4 angka (keputusan 29 Okt).
-- [ ] Payroll yang dihitung dari Supabase sama dengan payroll GAS untuk bulan-bulan sebelumnya.
-- [ ] **Cadangan per jam** (`pg_dump` terenkripsi ke penyimpanan privat gratis) berjalan, dan **uji pulih** ke project staging berhasil. Keputusan 29 Okt: opsi gratis dulu; Pro atau PITR hanya atas keputusan Gabriel.
-- [ ] Halaman web GAS rumah itu sudah ditutup atau dibuat hanya-baca.
-- [ ] **Latihan saklar balik** sudah dilakukan di staging: nyalakan, matikan, nyalakan lagi, tanpa ada nomor kembar dan tanpa kiriman ganda.
-- [ ] **Go-live serentak:** semua syarat ini terpenuhi di **ketiga** rumah sebelum saklar dinyalakan (keputusan 29 Okt).
+Tujuannya: GAS dan PWA kembali beroperasi persis seperti sebelum migrasi, lengkap dengan semua yang sudah dikerjakan di abadiops.
+- **Cermin balik.** Setelah jam mulai, cermin balik menyalin perubahan Supabase ke spreadsheet tiap beberapa menit. Bentuk datanya sama (baris dan kolom sheet) dan hanya ada satu penulis, jadi spreadsheet selalu hampir sama dengan Supabase.
+- **Tombol "Kembali ke GAS".** Cukup satu konfirmasi, tanpa daftar syarat. Urutannya:
+  1. saklar → `membuka`;
+  2. cermin balik terakhir, lalu periksa selisih;
+  3. saklar → `gas`.
+
+  Setelah itu GAS terbuka lagi, pemicunya hidup lagi, PWA kembali diteruskan ke GAS, dan cermin kembali ke arah spreadsheet → Supabase.
+- **Lapisan cadangan lain:** cadangan harian Supabase Pro (7 hari), cadangan database sesaat sebelum mulai, dan riwayat versi Google Sheets.
+- **Spreadsheet hanya ditulis setelah jam mulai**, dan hanya oleh cermin balik atau tombol kembali (izin Gabriel 14 Nov). Sebelum itu spreadsheet tetap tidak ditulis.
+- **Dilatih lebih dulu.** Tombol mulai dan tombol kembali dilatih di salinan spreadsheet sebelum jam mulai rumah mana pun.
+- **Kapan dipakai:**
+  - Supabase mati sebentar: jangan kembali dulu. Antrean di HP menampung kiriman dan mengirim ulang otomatis.
+  - Supabase mati lama atau ada bug di jalur Supabase: kembali ke GAS, perbaiki, lalu mulai lagi dari tombol mulai.
+
+## Ruang uji (keputusan Gabriel 14 Nov)
+
+- Pengujian dilakukan di Gedung 1 (produksi, paket Pro), di skema salinan `uji_<skema>` yang disegarkan dari cermin dengan SQL. Ukuran, mesin, dan isinya sama dengan produksi.
+- Skema cermin asli **tidak pernah ditulis sebelum jam mulai** rumah itu. Itu dijaga di database: penulisan ke skema asli ditolak kecuali saklar rumah itu `supabase`.
+- Worker `abadiops-*-staging` menjadi Worker uji yang membaca dan menulis skema `uji_*`.
+- Gedung 2 (proyek "Stagging") tidak dipakai lagi.
+
+## Syarat sebelum tombol mulai aktif
+
+- [ ] Kesehatan cermin hijau (lihat di atas).
+- [ ] Semua aksi baca, aksi tulis, dan halaman web rumah itu lulus uji kembar di ruang uji: hasil Worker sama dengan GAS, kolom per kolom.
+- [ ] Fitur yang memakai layanan Google sudah punya pengganti dan lulus uji: unduh payroll (`DriveApp`), pemicu terjadwal, email (`MailApp`), dan panggilan keluar (`UrlFetchApp`).
+- [ ] Payroll dari Supabase sama dengan payroll GAS untuk bulan-bulan sebelumnya.
+- [ ] `AuditLogs` dan `ProcessedOps` ikut tercermin.
+- [ ] Tambalan "tutup GAS" terpasang di GAS rumah itu. Tambalan ini tidur selama saklar `gas`.
+- [ ] Worker produksi sudah memakai kode GAS asli dan di-deploy ulang setelah upgrade Workers Paid. Worker yang di-deploy saat paket gratis tetap memakai batas CPU lama sampai di-deploy ulang (BUG-DICATAT #40).
+- [ ] Latihan mulai dan kembali sudah dilakukan di salinan spreadsheet, tanpa data hilang dan tanpa kiriman ganda.
+- [ ] Gabriel sudah menguji sendiri satu siklus WO penuh di ruang uji.
 - [ ] Gabriel menyetujui.
-
-## Saklar balik sebagai lapisan pengaman
-
-Kalau ada masalah, saklar dibalik dari `dua_cabang` kembali ke `gas`.
-- Yang dibalik **hanya tempat lahirnya WO baru**. WO yang sudah terlanjur lahir di Supabase tetap tinggal di Supabase.
-- **Supabase mati sebentar:** jangan dibalik. Antrean di HP menampung kiriman dan mengirim ulang otomatis.
-- **Supabase mati lama (berjam-jam):** balik ke `gas`. Untuk sementara daftar dilayani GAS. WO yang lahir di Supabase menunggu sampai Supabase hidup lagi.
-- **Ada bug di jalur Supabase:** balik ke `gas`, perbaiki, lalu nyalakan lagi.
-- **Menyalin WO dari Supabase kembali ke spreadsheet hanya jalan terakhir.** Ini prosedur darurat manual yang harus sudah dilatih sebelumnya.
-- **GAS harus tetap hidup penuh selama posisi `dua_cabang`.** Fungsi buat WO di GAS tidak dihapus, dan alamat `/exec` tidak berubah.
-
-## Cara saklar disimpan
-
-- Saklar harus bisa dibalik **dalam hitungan detik, tanpa deploy**. Simpan di tempat yang dibaca Worker pada setiap permintaan, misalnya Cloudflare KV, bukan di kode atau di `wrangler.toml`.
-- Saklar lama (`BACKEND_DRIVER` di `src/lib/backendConfig.ts`, `STORAGE_MODE` di `wrangler.toml` akar) berlaku untuk seluruh sistem sekaligus dan tidak mendukung `dua_cabang`. Keduanya akan diganti saklar per rumah ini. Sampai saat itu, aksi baca KMB Project tetap ke GAS lewat gerbang `AKSI_SUPABASE_LULUS_KEMBAR`, berapa pun nilai `STORAGE_MODE`.
 
 ## Panel saklar di `abadiops.com` (keputusan Gabriel, 29 Okt 2026)
 
@@ -68,49 +93,35 @@ Saklar dioperasikan dari **satu panel visual di domain pintu**. Daftar kamar dan
 - Panel **harus selalu bisa dibuka**, karena ia juga alat penyelamat. Panel dan penyimpanan saklar **hanya bergantung pada Cloudflare**, tidak pada Supabase maupun GAS. Saat Supabase atau GAS bermasalah, panel tetap hidup.
 
 **Tampilan**
-- Satu kartu per rumah, dengan tiga posisi (`gas` → `dua_cabang` → `supabase`). Posisi sekarang terlihat jelas lewat warna dan tulisan, beserta waktu dan pelaku perubahan terakhir.
+- Satu kartu per rumah. Posisi sekarang terlihat jelas lewat warna dan tulisan, beserta waktu dan pelaku perubahan terakhir, jam mulai migrasi (waktu setempat), dan **kesehatan cermin**:
+  - sinkron terakhir;
+  - hasil pemeriksaan selisih terakhir;
+  - hari tanpa selisih;
+  - sheet yang berbeda;
+  - tombol "Periksa sekarang".
+- Setelah jam mulai, kartu juga menampilkan kesehatan cermin balik: perubahan terakhir yang sudah tersalin ke spreadsheet.
 - Di bawahnya tampil riwayat perubahan saklar (siapa, kapan, dari → ke, alasan).
 
-**Menyalakan (maju) selalu dengan peringatan**
-- Sebelum maju, panel menampilkan **peringatan/caution**: apa yang akan berubah, siapa yang terdampak, dan cara membaliknya.
-- Panel juga menampilkan daftar "Syarat sebelum saklar sebuah rumah dinyalakan" di atas. Semua syarat harus dicentang.
+**Mulai migrasi selalu dengan peringatan**
+- Sebelum mulai, panel menampilkan **peringatan/caution**: apa yang akan berubah, siapa yang terdampak, dan cara kembali.
+- Panel menampilkan daftar syarat di atas. Semua syarat harus tercentang.
 - Pelaku wajib mengetik nama rumah dan alasannya sebagai konfirmasi.
-- Posisi `supabase` hanya bisa dipilih kalau WO lama rumah itu sudah habis.
 
-**Mematikan (mundur) = penyelamat**
-- Mundur dari `dua_cabang` ke `gas` selalu tersedia dan cepat. Cukup satu konfirmasi, tanpa daftar syarat, karena ini tombol darurat.
-- Mematikan saklar **tidak boleh merusak atau menghilangkan data**. Itu dijamin rancangan di atas:
-  - yang dibalik hanya tempat lahirnya WO baru;
-  - WO yang sudah lahir di Supabase tetap di Supabase dan bisa diselesaikan di sana;
-  - WO lama tetap di GAS;
-  - cermin terus berjalan searah;
-  - buku tamu kiriman mencegah kiriman ulang tercatat dua kali.
-- Worker rumah yang **gagal membaca** saklar memakai posisi `gas`. Itu posisi yang paling aman.
+**Kembali ke GAS = penyelamat**
+- Selalu tersedia dan cepat. Cukup satu konfirmasi, tanpa daftar syarat.
+- Kembali ke GAS **tidak boleh merusak atau menghilangkan data**. Itu dijamin oleh dua hal: hanya ada satu penulis pada satu waktu, dan cermin balik terakhir harus berselisih 0 sebelum GAS dibuka.
 
 **Teknis**
-- Nilai saklar disimpan di **Durable Object SQLite-backed** Cloudflare (`workers/pintu/src/saklar-do.js`): berlaku seketika (strongly consistent, zero latency) di semua lokasi edge Cloudflare dan didukung di paket gratis Cloudflare Workers.
+- Nilai saklar disimpan di **Durable Object SQLite-backed** Cloudflare (`workers/pintu/src/saklar-do.js`). Nilainya berlaku seketika (strongly consistent) di semua lokasi edge Cloudflare.
 - Panel visual aktif di rute `/saklar` pada Worker Pintu (`abadiops.com/saklar` dan `abadiops-pintu-staging.kawanabadigrup.workers.dev/saklar`).
-- Pintu menulis lewat antarmuka panel, Worker rumah membaca secara dinamis via `/api/saklar/status` (dengan in-memory cache 5 detik dan fallback aman ke `gas`). Perubahan saklar tidak memerlukan deploy worker sama sekali.
-- Setiap perubahan dicatat otomatis hingga 50 riwayat terakhir di Durable Object (siapa, kapan WIB, dari → ke, alasan), lalu disalin ke tabel "Catatan pembalikan" di bawah saat terjadi pembalikan produksi.
-- **Keadaan 30 Okt sore (audit):** Worker rumah baru membaca saklar di `/api/sehat`. Jalur API belum mengikutinya, jadi membalik saklar belum memindahkan apa pun (bug #27). Tanpa secret, panel tertutup (bug #26).
-
-## Target selesai migrasi (keputusan Gabriel, 29 Okt 2026)
-
-Migrasi sebuah rumah dianggap **siap** kalau:
-1. **Rencananya matang** dan setiap langkahnya sudah **diuji langsung**: staging, uji kembar, uji rekam-putar, dan latihan saklar balik.
-2. **Aman, dengan rencana cadangan dan jaring pengaman:**
-   - cadangan Supabase (paket Pro, ditambah keputusan PITR atau cadangan per jam);
-   - spreadsheet tetap hidup sebagai sumber dan arsip;
-   - cermin berjalan terus;
-   - buku tamu kiriman dan antrean di HP mengirim ulang otomatis;
-   - GAS tetap hidup penuh selama `dua_cabang`;
-   - saklar balik di panel sebagai tombol penyelamat.
-3. **Tinggal menyalakan saklar.** Semua syarat di atas tercentang di panel.
-
-**Momen go-live:** saklar rumah itu dinyalakan dari panel, lalu operasi ditunggu dan dipantau. Kalau ada masalah, saklar dimatikan dari panel tanpa ada data yang rusak atau hilang.
+- Pintu menulis lewat antarmuka panel. Worker rumah membaca saklar dinamis lewat *service binding* `PINTU`, dengan cache memori 5 detik. Perubahan saklar tidak memerlukan deploy.
+  - Kode Worker GAS asli di branch `staging` sudah mengikuti saklar.
+  - Worker produksi menyusul saat merge (BUG-DICATAT #27).
+- GAS membaca saklar rumahnya sendiri dari pintu, dengan cache singkat. Ini bagian dari tambalan "tutup GAS".
+- Setiap perubahan dicatat otomatis, hingga 50 riwayat terakhir, di Durable Object (siapa, kapan, dari → ke, alasan). Saat terjadi pembalikan produksi, catatan itu disalin ke tabel di bawah.
 
 ## Catatan pembalikan saklar
 
-| Tanggal dan jam (WIB) | Rumah | Dari → ke | Alasan | Oleh |
+| Tanggal dan jam (waktu setempat) | Rumah | Dari → ke | Alasan | Oleh |
 |---|---|---|---|---|
 | — | — | — | belum pernah dibalik | — |
