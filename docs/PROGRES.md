@@ -19,6 +19,10 @@ Formatnya:
   - **KMB V2 (@299) dan SUM (@199) staging pindah ke GAS asli** (`config/rumah.json` `kmbtra.gas`, `sum.gas`; `kmbtra.worker = "kmb"` dibaca pembundel); Worker `workers/kmb`, `workers/sum` memakai modul bersama, backend Raka dibuang (riwayat `e7a3b48`); produksi tetap meneruskan ke GAS (var `SAKLAR = "gas"` + ikatan pintu). GAS tiruan dan pintu staging diarahkan ke Worker baru.
   - **Uji baca KMB V2/SUM vs GAS lokal:** setiap jawaban yang berhasil identik (KMB V2 40/52, SUM 45/48); yang gagal semuanya batas infrastruktur: batas waktu query Supabase (57014) saat menyusun 10–15 MB `WorkOrders_Archive` per permintaan, dan batas CPU Worker (CPU p90 0,6 s, maks 2 s).
   - Cermin SUM/KMB TRA staging ternyata masih berisi baris rusak tulisan backend Raka (AuditLogs/ProcessedOps berbentuk salah, baris WorkOrders kosong); disinkron ulang utuh.
+  - **`cermin_baca` disusun sebagai teks JSON** (Archive SUM 8,8 s → 0,3 s; 12/12 identik; BUPR 66/66, baca cermin 186 → 78 ms). Batas waktu query API Supabase 8 s (`authenticator`).
+  - **Uji lokal tanpa batas CPU** (`wrangler dev` dari salinan di luar repo, data staging yang sama): alur tulis penuh KMB V2 dan SUM **identik dengan GAS** (buat WO → kirim kerja → approve L1 web → approve L2 web, poin dan arsip): KMB V2 4/4 + 24 sheet, SUM 4/4 + 19 sheet (SUM butuh HM, KM, dan `part_type`). Baca dan MAR Web: semua jawaban yang tidak kena batas waktu query identik; aksi terberat (`pull_my_wos`, `pull_approved`, halaman approvals SUM 3 MB) masih kena 57014 di mesin database gratis saat sibuk.
+  - Pusat admin diuji ulang lewat Worker GAS asli SUM dan KMB TRA yang baru: 67/67.
+  - Gedung 2 (staging) 435 MB dari batas 500 MB paket gratis.
 - Belum selesai / berikutnya:
   - **Cache sheet di Worker + ambil baris yang berubah saja** (`sinkron_at` per baris): syarat untuk KMB V2/SUM (batas waktu query, CPU, egress). Sesudahnya uji ulang tulis, web, dan pusat admin KMB V2/SUM.
   - Keputusan Gabriel: Workers Paid + Supabase Pro (BUG #40; pengingat tersimpan).
