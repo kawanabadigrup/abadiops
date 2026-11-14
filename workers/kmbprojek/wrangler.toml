@@ -1,21 +1,24 @@
-# Rumah KMB Project: Worker yang menyajikan PWA KMB Project dan meneruskan setiap panggilan API ke GAS KMB Project.
-# Rumah: kmbprojek · Pemegang: Raka · Tahap 3 (Pintu): 100% diteruskan ke GAS. Saklar: gas.
-# Penjelasan: workers/kmbprojek/README.md
+# Rumah KMB Projek: Worker yang menjalankan kode GAS KMB Projek yang ASLI di atas cermin Supabase
+# (keputusan Gabriel 14 Nov 2026, "GAS asli di Worker"). Selama saklar "gas", semua aksi diteruskan ke web app GAS.
+# Penjelasan: workers/kmbprojek/README.md.
+#
+# gas/gas-kamar.js TIDAK ada di repo (repo publik). Buat sebelum setiap deploy:
+#   node tools/kembar/bundel-gas.mjs --kamar=kmbprojek
+# Script dan versinya dari config/rumah.json kmbprojek.gas.
 name = "abadiops-porject-kmb"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+# node:crypto dan node:buffer untuk Utilities.computeDigest dan base64Encode (workers/bersama/gas-host.js).
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # Domain: kmbprojek.abadiops.com dipasang via dashboard Cloudflare (Settings -> Domains & Routes)
 # sama seperti abadiops.com, agar deploy lewat API token tanpa izin zona tidak gagal.
-# routes = [
-#   { pattern = "kmbprojek.abadiops.com", custom_domain = true }
-# ]
 
 # Akun Cloudflare kawanabadigrup. Dikunci supaya deploy tidak pernah nyasar ke akun lain.
 account_id = "9273ece6d47a3bb103159295c10ce9e6"
 
-# Service binding ke Pintu untuk membaca posisi saklar secara instan tanpa terkena blokir fetch zona yang sama (Bug #27).
+# Service binding ke Pintu untuk membaca posisi saklar (Bug #27).
 services = [
   { binding = "PINTU", service = "abadiops-pintu" }
 ]
@@ -30,36 +33,25 @@ not_found_handling = "none"
 
 [vars]
 RUMAH = "kmbprojek"
-SAKLAR = "gas"
 # Web app GAS produksi KMB Project (script 1cKrVdmxH_hD4yVTwqLAXKdUjwM5wd7Glh4MdlpT7oP8KDOaGNgJCJVyh).
 GAS_URL = "https://script.google.com/macros/s/AKfycbxh4086qGRZGDqAvdpO7UDdsvqk1Li9NR2rFZLlyVS6gS1zpGrZdcEsb_z-HzKOY02Y/exec"
 SUPABASE_URL = "https://sptgqsjgszwbreikxdph.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_PoWC64yv25bZizBrTL79vw_CuNQwhp3"
-STORAGE_MODE = "GAS"
 
 [observability]
 enabled = true
 
-# Panggung Latihan (Staging) - docs/GEDUNG-DAN-STAGING.md §2
+# Panggung Latihan (Staging) - docs/GEDUNG-DAN-STAGING.md §2. Tanpa GAS: semua aksi di aksi_worker dijawab
+# dari cermin kmb_projek di Gedung 2; aksi lain ditolak. Rahasia: SUPABASE_SERVICE_ROLE_KEY (kunci rahasia
+# Supabase Gedung 2), dipasang dengan `wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env staging`.
 [env.staging]
 name = "abadiops-kmbprojek-staging"
 workers_dev = true
 
 services = [
-  { binding = "GAS_TIRUAN", service = "abadiops-gas-tiruan" },
   { binding = "PINTU", service = "abadiops-pintu-staging" }
-]
-
-# Buku tamu kiriman: ikatan langsung ke SaklarDO milik pintu staging, tanpa rute publik (butir 5 serah-terima 13 Nov).
-[env.staging.durable_objects]
-bindings = [
-  { name = "SAKLAR_DO", class_name = "SaklarDO", script_name = "abadiops-pintu-staging" }
 ]
 
 [env.staging.vars]
 RUMAH = "kmbprojek"
-SAKLAR = "supabase"
-GAS_URL = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbprojek"
+GAS_URL = ""
 SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O"
-STORAGE_MODE = "SUPABASE"

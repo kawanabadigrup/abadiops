@@ -12,6 +12,19 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbprojek, sum, kmbtra (KMB Projek staging ke GAS asli; pusat admin lulus di keempat proyek)
+- Berubah:
+  - **KMB Projek staging pindah ke GAS asli di Worker** (keputusan Gabriel): skema Raka `kmb_projek` di Gedung 2 dicadangkan sebagai `kmb_projek_raka_20261114` (18 tabel, tidak dihapus); cermin KMB Projek dibuat dari spreadsheet (24 sheet, termasuk AuditLogs 6.232 baris). `config/rumah.json` `kmbprojek.gas` (@49, aksi sama dengan BUPR: 23 aksi API GAS keduanya identik).
+  - **Worker rumah GAS asli jadi satu modul bersama** `workers/bersama/gas-rumah.js`; `workers/kmbbupr/src/index.js` dan `workers/kmbprojek/src/index.js` hanya memasang bundel GAS masing-masing. Kode backend Raka KMB Projek dibuang (riwayat: `e7a3b48`). Jalur "teruskan ke GAS" mempertahankan perilaku produksi lama: status dan isi GAS apa adanya, `GAS_TIDAK_TERJANGKAU` 502 (BUG #20); diuji lokal 3/3.
+  - GAS tiruan meneruskan `kmbprojek` ke Worker barunya; pintu staging memperlakukan KMB Projek sebagai rumah GAS asli.
+  - **Pusat admin:** perbaikan izin tulis (posisi saklar dibaca sebagai teks; sebelumnya produksi akan selalu hanya-baca), diuji lokal 6/6. Cermin SUM/KMB TRA staging disinkron ulang (izin Gabriel).
+  - **Uji staging:** pusat admin lulus di keempat proyek: BUPR 37/37, SUM 29/29, KMB TRA 29/29, KMB Projek 29/29 (token terbitan panel langsung bisa masuk lewat Worker masing-masing; yang diganti/dicabut ditolak). Worker BUPR sesudah dipindah ke modul bersama: baca 66/66, web 36/36. Worker KMB Projek vs GAS lokal @49: 44/44 (dengan jeda). Data uji dikembalikan ke isi spreadsheet.
+  - **Ditemukan (BUG #40):** paket gratis Cloudflare Workers memotong CPU di 10 ms; GAS asli butuh ±13–180 ms. Uji beruntun KMB Projek: 245 dari 289 permintaan galat 1102.
+- Belum selesai / berikutnya:
+  - Keputusan Gabriel: Workers Paid (USD 5/bulan) sebelum saklar `supabase` dipakai di rumah mana pun (BUG #40).
+  - Uji tulis kembar dan MAR Web KMB Projek (skenario BUPR memakai akun dummy BUPR; perlu skenario KMB Projek) sesudah batas CPU diputuskan.
+  - Langkah (d) untuk KMB V2 dan SUM (GAS asli di Worker).
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (pusat admin di atas cermin; BUPR masuk pusat admin)
 - Berubah:
   - **Pusat admin panel pintu dibangun ulang di atas cermin** (BUG-DICATAT #39; permintaan Gabriel: kembangkan pusat admin yang ada, masukkan BUPR, pastikan setiap fungsi jalan per proyek). `workers/pintu/src/admin-cermin.js` menggantikan `user-admin.js`:

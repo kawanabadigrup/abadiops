@@ -88,10 +88,14 @@ function sheetDari(cermin, nama) {
 
 function zonaDari(cermin) { return (cermin.meta && cermin.meta.zona_waktu) || 'UTC'; }
 
-async function izinTulis(env, p, bacaPetaSaklar) {
+export async function izinTulis(env, p, bacaPetaSaklar) {
   if (String(env.LINGKUNGAN || '').toLowerCase() === 'staging') return { boleh: true };
   let pos = 'gas';
-  try { pos = ((await bacaPetaSaklar(env))[p.kode] || {}).posisi || 'gas'; } catch (_) { /* tetap gas */ }
+  try {
+    // bacaPetaSaklar (index.js) mengembalikan { kode: 'gas' | 'dua_cabang' | 'supabase' }.
+    const v = (await bacaPetaSaklar(env))[p.kode];
+    pos = (typeof v === 'string' ? v : v && v.posisi) || 'gas';
+  } catch (_) { /* tetap gas */ }
   if (pos === 'supabase') return { boleh: true };
   return {
     boleh: false,
