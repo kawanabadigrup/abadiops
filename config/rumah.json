@@ -11,7 +11,19 @@
       ["superintendent", "Superintendent (L2)"],
       ["foreman", "Foreman"],
       ["foreman_approver", "Foreman Approver"]
-    ]
+    ],
+    "admin": {
+      "sheet_pengguna": "Config_Mechanics",
+      "sheet_token": "ApiTokens",
+      "sheet_config": "^Config_",
+      "kolom_uang": {
+        "Config_BaseSettings": "*",
+        "Config_Factors": "*",
+        "Config_Units": ["unit_factor"],
+        "Config_Components": ["base_points", "target_hours"],
+        "Config_Mechanics": ["golongan"]
+      }
+    }
   },
   "kmbtra": {
     "nama": "KMB TRA / V2",
@@ -27,7 +39,20 @@
       ["mechanic", "Mekanik"],
       ["supervisor", "Supervisor / Planner (L1)"],
       ["superintendent", "Superintendent / Manager (L2)"]
-    ]
+    ],
+    "admin": {
+      "sheet_pengguna": "Config_Mechanics",
+      "sheet_token": "ApiTokens",
+      "sheet_config": "^Config_",
+      "kolom_uang": {
+        "Config_BaseSettings": "*",
+        "Config_Factors": "*",
+        "Config_Units": ["unit_factor"],
+        "Config_Components": ["base_points", "target_hours"],
+        "Config_Jobs_Field": ["base_point", "plan_hours"],
+        "Config_Mechanics": ["grade"]
+      }
+    }
   },
   "kmbprojek": {
     "nama": "KMB Projek",
@@ -42,7 +67,21 @@
       ["mechanic", "Mekanik"],
       ["supervisor", "Supervisor / Planner (L1)"],
       ["superintendent", "Superintendent / Manager (L2)"]
-    ]
+    ],
+    "admin": {
+      "sheet_pengguna": "Config_Mechanics",
+      "sheet_token": "ApiTokens",
+      "sheet_config": "^Config_",
+      "kolom_uang": {
+        "Config_BaseSettings": "*",
+        "Config_Factors": "*",
+        "Config_Units": ["unit_factor"],
+        "Config_Components": ["base_point", "plan_hours"],
+        "Config_Jobs_Field": ["base_point", "plan_hours"],
+        "Config_Jobs_Workshop": ["base_point", "plan_hours"],
+        "Config_Mechanics": ["grade"]
+      }
+    }
   },
   "kmbbupr": {
     "nama": "KMB Projek BUPR",
@@ -58,6 +97,20 @@
       ["supervisor", "Supervisor / Planner (L1)"],
       ["superintendent", "Superintendent / Manager (L2)"]
     ],
+    "admin": {
+      "sheet_pengguna": "Config_Mechanics",
+      "sheet_token": "ApiTokens",
+      "sheet_config": "^Config_",
+      "kolom_uang": {
+        "Config_BaseSettings": "*",
+        "Config_Factors": "*",
+        "Config_Units": ["unit_factor"],
+        "Config_Components": ["base_point", "plan_hours"],
+        "Config_Jobs_Field": ["base_point", "plan_hours"],
+        "Config_Jobs_Workshop": ["base_point", "plan_hours"],
+        "Config_Mechanics": ["grade"]
+      }
+    },
     "gas": {
       "script": "1EMxIxcP1NMqLyjaaFOMbldYBGDdF_mb0OCLjbd3In0PymjTAoUR2XLiM",
       "versi": 11,

@@ -17,7 +17,7 @@
 
 import { SaklarDO } from './saklar-do.js';
 import { verifikasiKataSandi, validasiSesi } from './saklar-auth.js';
-import { tanganiApiUserAdmin, handleAdminDaftarUsers, handleAdminSimpanUser, handleAdminSetTokenStatus } from './user-admin.js';
+import { tanganiAdminCermin } from './admin-cermin.js';
 import PROFIL_RUMAH from '../../../config/rumah.json';
 
 export { SaklarDO };
@@ -197,7 +197,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Token',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
     }
@@ -227,22 +227,10 @@ export default {
       });
     }
 
-    // API Manajemen Pengguna & Token Terpusat (Stateless -> Supabase RPC per Kamar)
-        // API Manajemen Pengguna & Token Terpusat (Stateless -> Supabase RPC per Kamar)
-    // GET  /saklar/api/admin/users        -> handleAdminDaftarUsers
-    // POST /saklar/api/admin/users/simpan -> handleAdminSimpanUser
-    // POST /saklar/api/admin/tokens/status -> handleAdminSetTokenStatus
-    if (url.pathname === '/saklar/api/admin/users') return handleAdminDaftarUsers(request, env);
-    if (url.pathname === '/saklar/api/admin/users/simpan') return handleAdminSimpanUser(request, env);
-    if (url.pathname === '/saklar/api/admin/tokens/status') return handleAdminSetTokenStatus(request, env);
-    if (
-      url.pathname.startsWith('/saklar/api/users') ||
-      url.pathname.startsWith('/saklar/api/admin/') ||
-      url.pathname.startsWith('/api/admin/users') ||
-      url.pathname.startsWith('/saklar/api/config') ||
-      url.pathname.startsWith('/api/admin/config')
-    ) {
-      return tanganiApiUserAdmin(request, env, url, json);
+    // Pusat admin (pengguna, token, sheet config setiap rumah) di atas cermin spreadsheet; hanya sesi panel.
+    // Lihat src/admin-cermin.js.
+    if (url.pathname.startsWith('/saklar/api/admin/')) {
+      return tanganiAdminCermin(request, env, url, json, bacaPetaSaklar);
     }
 
     // API Status Saklar (Khusus Panel Saklar - butuh autentikasi)

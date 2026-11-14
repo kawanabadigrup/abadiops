@@ -4,6 +4,8 @@
 name = "abadiops-pintu"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+# node:crypto untuk tiruan layanan Google dan penyusun perubahan cermin (pusat admin, src/admin-cermin.js).
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # Akun Cloudflare kawanabadigrup. Dikunci supaya deploy tidak pernah nyasar ke akun lain.
@@ -61,6 +63,9 @@ bindings = [
 ]
 
 [env.staging.vars]
+# Staging tidak punya GAS sungguhan; Gedung 2 satu-satunya sumber data, jadi pusat admin boleh menulis tanpa
+# menunggu saklar "supabase" (src/admin-cermin.js izinTulis). Produksi tidak memakai variabel ini.
+LINGKUNGAN = "staging"
 SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
 SUPABASE_ANON_KEY = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O"
 RUMAH = [

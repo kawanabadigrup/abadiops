@@ -12,6 +12,21 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (pusat admin di atas cermin; BUPR masuk pusat admin)
+- Berubah:
+  - **Pusat admin panel pintu dibangun ulang di atas cermin** (BUG-DICATAT #39; permintaan Gabriel: kembangkan pusat admin yang ada, masukkan BUPR, pastikan setiap fungsi jalan per proyek). `workers/pintu/src/admin-cermin.js` menggantikan `user-admin.js`:
+    - pengguna (`Config_Mechanics`) dan token (`ApiTokens`): daftar, tambah/ubah, hapus, terbitkan (token aktif dikembalikan, seperti `createTokenForUser`), ganti, cabut; token baru `awalan rumah + 20 hex`, dicek ke token semua rumah;
+    - sheet config: setiap sheet `Config_*` rumah itu sebagai sub-tab, kolom dari judul sheet;
+    - tulis lewat tiruan SpreadsheetApp + `cermin_tulis` (bentuk sel sama dengan GAS dan alat sinkron), versi sheet diperiksa (409), kolom uang wajib konfirmasi kedua di server (428, `config/rumah.json` `<rumah>.admin.kolom_uang`), log `public.cermin_admin_log` (token disamarkan);
+    - hanya sesi panel; tulis hanya bila saklar rumah `supabase` atau pintu staging (`LINGKUNGAN = "staging"`).
+  - Panel (`saklar.html`): tab Pengguna dan Config dibuat dari kolom sheet; isian token admin per rumah dibuang.
+  - `db/bersama/cermin_baca.sql`: parameter `p_hanya` (hanya sheet tertentu) dan `semua_sheet`; `db/bersama/cermin_admin_log.sql` (baru). Keduanya terpasang di Gedung 2. Worker BUPR tetap 66/66.
+  - Pintu: `compatibility_flags = ["nodejs_compat"]`. Pintu staging `4135b207`.
+  - **Uji pintu staging:** BUPR semua fungsi tulis 37/37, termasuk token terbitan pusat admin langsung bisa masuk lewat Worker GAS asli dan token yang diganti/dicabut ditolak; bentuk cermin tetap rapi; SUM dan KMB TRA terbaca; KMB Projek menjawab "belum ada cermin" (skema staging masih tabel Raka). Data staging BUPR dikembalikan ke isi spreadsheet.
+- Belum selesai / berikutnya:
+  - Menunggu izin Gabriel: jalankan `db/bersama/hapus_admin_lama.sql` di Gedung 2 (fungsi `_bertoken` lama membuka token produksi ke supervisor), sinkron ulang cermin SUM dan KMB TRA staging, lalu uji tulis SUM dan KMB TRA.
+  - KMB Projek staging pindah ke GAS asli (keputusan Gabriel 14 Nov): cadangkan skema Raka, buat cermin, Worker KMB Projek menjalankan GAS @49.
+
 ### 2026-11-14 · Gabriel (+ Claude) · kmbtra, sum, kmbprojek, kmbbupr (celah `google.script.run` di keempat GAS produksi ditutup)
 - Berubah:
   - **Produksi GAS:** penjaga `google.script.run` terpasang di keempat script (BUG-DICATAT #37, KEPUTUSAN 14 Nov): **BUPR @11, KMB Project @49, KMB V2 @299, SUM V2 @199**. Claude `clasp push`, Gabriel Deploy dari editor.

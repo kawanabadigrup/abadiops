@@ -10,13 +10,17 @@
 --                   yang kolomnya sama persis dengan nilai itu (dengan nomor barisnya) ditambah jumlah baris.
 --                   Untuk ProcessedOps pada aksi tulis: GAS hanya mencari op_id kiriman ini lalu menambah satu
 --                   baris, jadi seluruh isi sheet tidak perlu dikirim.
+--   p_hanya         bila diisi, hanya sheet ini yang dikembalikan (sheet lain tidak disebut sama sekali). Untuk pusat
+--                   admin di pintu, yang menyunting satu-dua sheet config tanpa memuat sheet transaksi yang besar.
+--                   Nama semua sheet tetap ada di "semua_sheet".
 -- sinkron_at per sheet adalah versinya: public.cermin_tulis hanya menyimpan bila versi itu belum berubah.
 --
 -- Isinya mentah, termasuk token di ApiTokens. Karena itu hanya service_role yang boleh memanggil;
 -- anon dan authenticated tidak. Token diperiksa oleh kode GAS itu sendiri (_resolveToken).
 DROP FUNCTION IF EXISTS public.cermin_baca(text, text[]);
+DROP FUNCTION IF EXISTS public.cermin_baca(text, text[], jsonb);
 
-CREATE OR REPLACE FUNCTION public.cermin_baca(p_skema text, p_tidak_dimuat text[] DEFAULT '{}'::text[], p_jarang jsonb DEFAULT '{}'::jsonb)
+CREATE OR REPLACE FUNCTION public.cermin_baca(p_skema text, p_tidak_dimuat text[] DEFAULT '{}'::text[], p_jarang jsonb DEFAULT '{}'::jsonb, p_hanya text[] DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -29,6 +33,7 @@ DECLARE
   v_rows    jsonb;
   v_jumlah  integer;
   v_tanggal jsonb;
+  v_semua   jsonb;
   j         jsonb;
   r         record;
 BEGIN
@@ -39,7 +44,13 @@ BEGIN
   EXECUTE format('SELECT coalesce(jsonb_object_agg(kunci, nilai), ''{}''::jsonb) FROM %I.cermin_meta', p_skema)
      INTO v_meta;
 
+  EXECUTE format('SELECT coalesce(jsonb_agg(sheet ORDER BY sheet), ''[]''::jsonb) FROM %I.cermin_header', p_skema)
+     INTO v_semua;
+
   FOR r IN EXECUTE format('SELECT sheet, tabel, headers, tipe, sinkron_at::text AS versi FROM %I.cermin_header ORDER BY sheet', p_skema) LOOP
+    IF p_hanya IS NOT NULL AND NOT (r.sheet = ANY (p_hanya)) THEN
+      CONTINUE;
+    END IF;
     IF r.sheet = ANY (coalesce(p_tidak_dimuat, '{}'::text[])) THEN
       v_bagian := v_bagian || jsonb_build_object(r.sheet, jsonb_build_object('tidak_dimuat', true));
       CONTINUE;
@@ -68,10 +79,10 @@ BEGIN
   END LOOP;
 
   -- Satu penggabungan di akhir, bukan menyambung objek yang terus membesar di setiap putaran.
-  RETURN jsonb_build_object('meta', v_meta,
+  RETURN jsonb_build_object('meta', v_meta, 'semua_sheet', v_semua,
     'sheets', (SELECT coalesce(jsonb_object_agg(k.key, k.value), '{}'::jsonb) FROM unnest(v_bagian) AS b(o), jsonb_each(b.o) AS k));
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.cermin_baca(text, text[], jsonb) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.cermin_baca(text, text[], jsonb) TO service_role;
+REVOKE ALL ON FUNCTION public.cermin_baca(text, text[], jsonb, text[]) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cermin_baca(text, text[], jsonb, text[]) TO service_role;
