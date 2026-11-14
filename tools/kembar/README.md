@@ -5,6 +5,7 @@ Alat untuk menjalankan kode GAS ASLI sebuah rumah di luar Google, di atas cermin
 | Alat | Gunanya |
 |---|---|
 | `gas-lokal.mjs` | Menjalankan kode GAS rumah di komputer kerja sebagai pembanding uji kembar. Tidak memanggil `/exec`, tidak memakai token di Google, dan tidak menulis ke spreadsheet. Kondisinya sama dengan Worker: mode ketat dan zona mesin UTC |
+| `templat-gas.mjs` | Mengompilasi template HtmlService (`<? ?>`, `<?= ?>`, `<?!= ?>`) menjadi fungsi JS biasa tanpa `eval`/`with`, dengan escaping `<?= ?>` menurut konteks. Dipakai bundel Worker dan GAS lokal (`web()`, `jalankan()`) |
 | `bundel-gas.mjs` | Membungkus kode GAS versi yang dipatok di `config/rumah.json` menjadi `workers/<kamar>/gas/gas-kamar.js` untuk Worker rumah. Hasilnya tidak di-commit |
 
 Keduanya memakai layanan Google tiruan yang sama dengan Worker (`workers/bersama/gas-layanan.js`) dan data yang sama (`public.cermin_baca`, `db/bersama/cermin_baca.sql`).

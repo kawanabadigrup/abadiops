@@ -12,6 +12,25 @@ Formatnya:
 
 ---
 
+### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (MAR Web asli BUPR di Worker)
+- Berubah:
+  - **MAR Web BUPR = halaman web GAS yang asli**, dijalankan di Worker staging: `GET /web` (doGet + template HtmlService) dan `POST /web/run` (`google.script.run`). Tidak ada halaman yang ditulis ulang.
+    - `tools/kembar/templat-gas.mjs` (baru): template dikompilasi saat bundel menjadi fungsi JS biasa (Worker tanpa `eval`/`with`); `<?= ?>` di-escape menurut konteks letaknya.
+    - `workers/bersama/gas-layanan.js`: `HtmlService` (template, `createHtmlOutput`, `HtmlOutput`), `ScriptApp.getService().getUrl()` = alamat `/web` Worker, `buatPermintaanGet`, dan `hasilRun` (aturan nilai balik `google.script.run`).
+    - `workers/bersama/gas-web.js` (baru): `google.script` untuk peramban dan penyisipannya ke HTML.
+    - `tools/kembar/bundel-gas.mjs`: ikut membungkus template, HTML mentah, `doGet`, dan **daftar izin `google.script.run`**: hanya fungsi yang disebut halaman web (BUPR @9: 56 dari 733 fungsi publik). Fungsi lain dijawab "Script function not found".
+    - `tools/kembar/gas-lokal.mjs`: `web(qs)` dan `jalankan(fungsi, args)` sebagai pembanding.
+    - Worker kmbbupr: satu jalur "jalankan GAS lalu simpan" untuk API tulis, halaman web, dan `google.script.run`. Seperti di GAS, tulisan tetap disimpan walaupun fungsi lalu melempar galat.
+  - **Uji di staging:**
+    - 36 halaman (SPT, SPV, mekanik WO mandiri, mekanik biasa × 9 halaman) dan halaman tanpa token identik dengan GAS lokal. Gerbang peran sesuai GAS BUPR: mekanik WO mandiri boleh membuka "create", mekanik biasa tidak;
+    - approve L1 dan L2 lewat `google.script.run` sesudah buat WO dan kirim kerja lewat API: jawaban identik, dan isi akhir 24 sheet identik (poin 330);
+    - halaman Approval, Monitoring, Teknis, dan Koreksi HM berjalan di happy-dom tanpa galat JavaScript; Teknis memanggil server saat dimuat dan dijawab Worker;
+    - `listTokens`, `generateTokensForAllUsers`, dan `resetTransaksiSaja` ditolak lewat `/web/run`.
+  - Data staging BUPR dikembalikan ke isi spreadsheet sesudah uji (14 Nov 14.02 WIB).
+- Belum selesai / berikutnya:
+  - Escaping `<?= ?>` dan aturan nilai balik `google.script.run` ditiru dari perilaku GAS yang terdokumentasi; belum dicocokkan dengan keluaran GAS sungguhan.
+  - (c) Pusat admin baru (penyunting sheet config) di BUPR.
+
 ### 2026-11-14 · Gabriel (+ Claude) · bersama, kmbbupr (BUPR staging bisa dicoba dari HP)
 - Berubah:
   - **PWA BUPR** `pwa/kmbbupr`: salinan 1:1 `kawanabadigrup/PWA-Project-KMB2` (`ba4d81d`). Hanya satu baris alamat API di `app.js` dan `sw.js` yang diganti `./api`; empat berkas lain identik byte demi byte. Disajikan Worker `abadiops-kmbbupr-staging`; `/web` sementara menampilkan pemberitahuan.

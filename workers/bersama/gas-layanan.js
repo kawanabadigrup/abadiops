@@ -480,6 +480,74 @@ export function buatLayanan(D, host) {
   };
   var Logger = { log: function () { catatLog(arguments); return Logger; }, getLog: function () { return CATAT.log.join('\n'); }, clear: function () {} };
 
+  // ── HtmlService: template hasil kompilasi tools/kembar/templat-gas.mjs, dipasang lewat __pasangTemplat ──
+  var TEMPLAT = {}, CARI_GLOBAL = function () { return undefined; };
+  function teksCetak(v) { return v === null || v === undefined ? '' : String(v); }
+  function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&#34;').replace(/'/g, '&#39;'); }
+  function escJsString(s) {
+    return s.replace(/[\\'"<>&=`\u2028\u2029\x00-\x1f]/g, function (c) {
+      var h = c.charCodeAt(0).toString(16);
+      return h.length <= 2 ? '\\x' + ('0' + h).slice(-2) : '\\u' + ('000' + h).slice(-4);
+    });
+  }
+  // Pencetak <?= ?> per konteks (lihat templat-gas.mjs). <?!= ?> mencetak apa adanya.
+  var PENCETAK = {
+    html: function (v) { return escHtml(teksCetak(v)); },
+    attr: function (v) { return escHtml(teksCetak(v)); },
+    'url-awal': function (v) {
+      var s = teksCetak(v);
+      if (/^\s*(javascript|vbscript|data):/i.test(s)) return '#zSoyz';
+      return escHtml(s.replace(/[\s"'<>\\`]/g, function (c) { return encodeURIComponent(c); }));
+    },
+    'url-tengah': function (v) { return escHtml(encodeURIComponent(teksCetak(v))); },
+    onevent: function (v) { return escHtml(escJsString(teksCetak(v))); },
+    js: function (v) { return escJsString(teksCetak(v)); },
+    jskode: function (v) { var j = JSON.stringify(v === undefined ? null : v); return escJsString(String(j)).replace(/\\x22/g, '"'); },
+    css: function (v) { return teksCetak(v).replace(/[<>"'\\]/g, ''); },
+    komentar: function (v) { return teksCetak(v).replace(/\*\//g, '* /'); },
+    mentah: function (v) { return teksCetak(v); },
+  };
+  // Properti internal tidak boleh terlihat sebagai properti template (scriptlet membaca properti sendiri).
+  function Templat(nama) { Object.defineProperty(this, '__namaTemplat', { value: nama, enumerable: false }); }
+  Templat.prototype.evaluate = function () {
+    var f = TEMPLAT[this.__namaTemplat];
+    if (!f) throw new Error('GAS lokal: template ' + this.__namaTemplat + ' tidak dikompilasi');
+    return keluaranHtml(f(this, CARI_GLOBAL, PENCETAK));
+  };
+  Templat.prototype.getRawContent = function () { return (D.html || {})[this.__namaTemplat] || ''; };
+  function KeluaranHtml(isi) { this._isi = isi; this._judul = ''; this._meta = []; this._favicon = ''; this._xframe = ''; }
+  KeluaranHtml.prototype = {
+    getContent: function () { return this._isi; },
+    setContent: function (x) { this._isi = teksCetak(x); return this; },
+    append: function (x) { this._isi += teksCetak(x); return this; },
+    appendUntrusted: function (x) { this._isi += escHtml(teksCetak(x)); return this; },
+    clear: function () { this._isi = ''; return this; },
+    getTitle: function () { return this._judul; },
+    setTitle: function (x) { this._judul = teksCetak(x); return this; },
+    addMetaTag: function (nama, isi) { this._meta.push({ nama: teksCetak(nama), isi: teksCetak(isi) }); return this; },
+    getMetaTags: function () { return this._meta.slice(); },
+    setFaviconUrl: function (x) { this._favicon = teksCetak(x); return this; },
+    getFaviconUrl: function () { return this._favicon; },
+    setXFrameOptionsMode: function (x) { this._xframe = x; return this; },
+    setSandboxMode: function () { return this; },
+    setWidth: function () { return this; },
+    setHeight: function () { return this; },
+    getAs: function () { catatSekali(CATAT.tak_dikenal, 'HtmlOutput.getAs'); return null; },
+  };
+  function keluaranHtml(isi) { return tanpaDikenal('HtmlOutput', new KeluaranHtml(teksCetak(isi))); }
+  var HtmlService = tanpaDikenal('HtmlService', {
+    createTemplateFromFile: function (nama) { return new Templat(String(nama)); },
+    createHtmlOutputFromFile: function (nama) {
+      var isi = (D.html || {})[String(nama)];
+      if (isi === undefined) throw new Error('No HTML file named ' + nama + ' was found.');
+      return keluaranHtml(isi);
+    },
+    createHtmlOutput: function (x) { return keluaranHtml(x && typeof x.getContent === 'function' ? x.getContent() : x); },
+    createTemplate: function () { catatSekali(CATAT.layanan, 'HtmlService.createTemplate'); throw new Error('GAS lokal: createTemplate dari teks tidak didukung (template dikompilasi saat bundel)'); },
+    XFrameOptionsMode: { ALLOWALL: 'ALLOWALL', DEFAULT: 'DEFAULT' },
+    SandboxMode: { IFRAME: 'IFRAME', NATIVE: 'NATIVE', EMULATED: 'EMULATED' },
+  });
+
   // Isi baru setiap sheet yang ditulis, dalam bentuk cermin (tools/cermin/sinkron.mjs): header, baris nilai
   // (Date → ISO), dan tipe per kolom dihitung dari baris data. Baris dan kolom kosong di ujung dipotong,
   // sama dengan getDataRange(). Sheet yang dibuat insertSheet ditandai baru.
@@ -545,6 +613,7 @@ export function buatLayanan(D, host) {
   return {
     __CATAT: CATAT,
     __ekspor: ekspor,
+    __pasangTemplat: function (t, g) { TEMPLAT = t || {}; CARI_GLOBAL = g || CARI_GLOBAL; },
     Date: DateZona,
     SpreadsheetApp: tanpaDikenal('SpreadsheetApp', {
       getActiveSpreadsheet: function () { return SS; },
@@ -565,7 +634,8 @@ export function buatLayanan(D, host) {
       MimeType: { JSON: 'JSON', TEXT: 'TEXT', JAVASCRIPT: 'JAVASCRIPT', CSV: 'CSV', XML: 'XML', ICAL: 'ICAL', RSS: 'RSS', ATOM: 'ATOM', VCARD: 'VCARD' },
     },
     ScriptApp: tanpaDikenal('ScriptApp', {
-      getService: function () { return { getUrl: function () { return 'https://script.google.com/macros/s/GAS-LOKAL/exec'; } }; },
+      // Alamat web app = alamat web Worker yang sedang melayani (D.urlWeb), supaya tautan antarhalaman tetap di sini.
+      getService: function () { return { getUrl: function () { return D.urlWeb || 'https://script.google.com/macros/s/GAS-LOKAL/exec'; } }; },
       getProjectTriggers: function () { return []; },
       newTrigger: function () { catatSekali(CATAT.layanan, 'ScriptApp.newTrigger'); return tanpaDikenal('TriggerBuilder', {}); },
       deleteTrigger: function () { catatSekali(CATAT.layanan, 'ScriptApp.deleteTrigger'); },
@@ -579,7 +649,7 @@ export function buatLayanan(D, host) {
     UrlFetchApp: tidakTersedia('UrlFetchApp'),
     GmailApp: tidakTersedia('GmailApp'),
     DriveApp: tidakTersedia('DriveApp'),
-    HtmlService: tidakTersedia('HtmlService'),
+    HtmlService: HtmlService,
     Browser: tidakTersedia('Browser'),
     Logger: Logger,
     console: { log: function () { catatLog(arguments); }, info: function () { catatLog(arguments); }, warn: function () { catatLog(arguments); }, error: function () { catatLog(arguments); }, time: function () {}, timeEnd: function () {} },
@@ -593,6 +663,38 @@ export const NAMA_LAYANAN = ['Date', 'SpreadsheetApp', 'Utilities', 'Session', '
 // Satu permintaan PWA: POST text/plain berisi {token, action, op_id, data}, seperti yang diterima doPost di produksi.
 export function buatPermintaanPost(isiJson) {
   return { postData: { contents: isiJson, type: 'text/plain', length: isiJson.length, name: 'postData' }, parameter: {}, parameters: {}, contextPath: '', contentLength: isiJson.length, queryString: '' };
+}
+
+// Objek e untuk doGet dari query string, seperti di GAS: parameter berisi nilai pertama, parameters semua nilai.
+export function buatPermintaanGet(queryString) {
+  var qs = String(queryString || '').replace(/^\?/, ''), parameter = {}, parameters = {};
+  qs.split('&').forEach(function (p) {
+    if (!p) return;
+    var i = p.indexOf('=');
+    var k = decodeURIComponent((i < 0 ? p : p.slice(0, i)).replace(/\+/g, ' '));
+    var v = i < 0 ? '' : decodeURIComponent(p.slice(i + 1).replace(/\+/g, ' '));
+    if (!Object.prototype.hasOwnProperty.call(parameter, k)) parameter[k] = v;
+    (parameters[k] = parameters[k] || []).push(v);
+  });
+  return { parameter: parameter, parameters: parameters, queryString: qs, contextPath: '', contentLength: -1, pathInfo: '' };
+}
+
+// Nilai balik fungsi server untuk google.script.run: hanya primitif, larik, dan objek polos yang sah. Jawaban yang
+// memuat Date (atau jenis lain yang tidak sah) diterima peramban sebagai null, karena itulah kode GAS sendiri
+// membungkus sebagian jawabannya dengan JSON.parse(JSON.stringify(...)).
+export function hasilRun(v) {
+  var sah = true;
+  (function periksa(x) {
+    if (!sah || x === null || x === undefined) return;
+    var t = typeof x;
+    if (t === 'number' || t === 'string' || t === 'boolean') return;
+    if (t === 'function' || t === 'symbol' || t === 'bigint' || x instanceof Date) { sah = false; return; }
+    if (Array.isArray(x)) { x.forEach(periksa); return; }
+    var p = Object.getPrototypeOf(x);
+    if (p !== Object.prototype && p !== null) { sah = false; return; }
+    Object.keys(x).forEach(function (k) { periksa(x[k]); });
+  })(v);
+  return sah ? (v === undefined ? null : JSON.parse(JSON.stringify(v))) : null;
 }
 
 // Hasil public.cermin_baca → data untuk buatLayanan.

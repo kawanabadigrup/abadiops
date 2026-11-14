@@ -13,7 +13,7 @@ PWA / web ──POST {token, action, op_id, data}──▶ abadiops-kmbbupr (Wor
 
 ## Mencoba dari HP (staging)
 
-Buka pintu staging (`abadiops-pintu-staging…/`), masukkan token BUPR, lalu pilih **Aplikasi**. Atau langsung buka Worker staging di akarnya. PWA-nya `pwa/kmbbupr`: salinan 1:1 `kawanabadigrup/PWA-Project-KMB2` (`ba4d81d`); hanya alamat API (`app.js` `CONFIG.API_URL`, `sw.js` `API_URL`) yang diganti `./api`. Datanya cermin `kmbbupr` di Gedung 2 (salinan produksi), jadi apa pun yang dilakukan di sini tidak menyentuh spreadsheet produksi. **Web Biasa** masih menampilkan pemberitahuan sampai MAR Web asli dipindah.
+Buka pintu staging (`abadiops-pintu-staging…/`), masukkan token BUPR, lalu pilih **Aplikasi**. Atau langsung buka Worker staging di akarnya. PWA-nya `pwa/kmbbupr`: salinan 1:1 `kawanabadigrup/PWA-Project-KMB2` (`ba4d81d`); hanya alamat API (`app.js` `CONFIG.API_URL`, `sw.js` `API_URL`) yang diganti `./api`. Datanya cermin `kmbbupr` di Gedung 2 (salinan produksi), jadi apa pun yang dilakukan di sini tidak menyentuh spreadsheet produksi. **Web Biasa** membuka MAR Web asli (`/web`).
 
 Pintu staging mengenali token BUPR lewat GAS tiruan, yang meneruskan `/kmbbupr` ke Worker ini (ikatan `RUMAH_KMBBUPR`). Kamar "GAS asli di Worker" tidak ditanya ke fungsi ping Supabase.
 
@@ -21,11 +21,12 @@ Pintu staging mengenali token BUPR lewat GAS tiruan, yang meneruskan `/kmbbupr` 
 
 | Berkas | Isinya |
 |---|---|
-| `src/index.js` | Rute API (`./api`), file PWA, `/web` sementara, pilihan jalur (Worker atau GAS), dan penolakan "gagal tertutup" |
+| `src/index.js` | Rute API (`./api`), file PWA, MAR Web (`/web`, `/web/run`), pilihan jalur (Worker atau GAS), dan penolakan "gagal tertutup" |
 | `../../pwa/kmbbupr/` | PWA BUPR (salinan 1:1, hanya alamat API diganti) |
 | `gas/gas-kamar.js` | Kode GAS BUPR yang dibungkus. **Tidak ada di repo** (repo publik); dibuat ulang sebelum deploy |
 | `../bersama/gas-layanan.js` | Layanan Google tiruan (`SpreadsheetApp`, `Date` berzona skrip, `Utilities`, …), dipakai juga `tools/kembar` |
 | `../bersama/gas-host.js` | Hash, UUID, dan base64 sinkron untuk `Utilities` (butuh `nodejs_compat`) |
+| `../bersama/gas-web.js` | `google.script` untuk peramban dan penyisipannya ke HTML hasil `doGet` |
 | `../bersama/saklar.js` | Posisi saklar dari SaklarDO pintu lewat ikatan `PINTU` |
 | `../../db/bersama/cermin_baca.sql` | RPC isi cermin per sheet; hanya `service_role` yang boleh memanggil |
 
@@ -48,6 +49,18 @@ Worker tidak pernah mengirim jawaban yang mungkin salah. Aksinya dijawab dengan 
 - memakai baris sheet jarang yang tidak dimuat (`tidak_aman`);
 - menulis pada aksi baca (tulisan hanya disimpan lewat `aksi_tulis_worker`), atau membuat sheet baru;
 - melempar galat di luar `doPost`, cermin tidak terbaca, atau penyimpanan gagal karena alasan selain konflik.
+
+## MAR Web (halaman web GAS yang asli)
+
+`GET /web?token=…&page=…` menjalankan `doGet` GAS BUPR beserta template HtmlService-nya; `POST /web/run` melayani `google.script.run` dari halaman itu.
+
+- **Template dikompilasi saat bundel** (`tools/kembar/templat-gas.mjs`), karena Worker tidak mengizinkan `eval` dan selalu mode ketat (tanpa `with`). Properti template dan nama global GAS dipetakan ke variabel scriptlet; `<?= ?>` di-escape menurut konteksnya (teks HTML, atribut, awal/tengah URL, atribut event, string JS).
+- **`google.script` disisipkan** ke awal `<head>` (`../bersama/gas-web.js`): `run` (dengan `withSuccessHandler`, `withFailureHandler`, `withUserObject`), `url.getLocation`, `host`, `history`. Tautan antarhalaman memakai `ScriptApp.getService().getUrl()`, yang di sini adalah alamat `/web` Worker.
+- **Daftar izin `google.script.run`**: hanya fungsi publik yang disebut di berkas HTML (`INFO.fungsiWeb`, dihitung saat bundel; BUPR @9: 56 fungsi). Fungsi lain, termasuk alat perawatan, dijawab "Script function not found".
+- Nilai balik yang memuat `Date` diterima peramban sebagai `null` (aturan `google.script.run`). Tulisan disimpan lewat `cermin_tulis` seperti aksi tulis API; seperti di GAS, tulisan tetap disimpan walaupun fungsi lalu melempar galat.
+- Disajikan hanya bila Supabase sumber datanya (saklar `supabase` atau tanpa GAS); selain itu `/web` diarahkan ke web app GAS. Jawaban `Cache-Control: no-store` dan `Referrer-Policy: no-referrer`, karena halaman memuat token.
+
+Uji 14 Nov 2026: 36 halaman (4 peran × 9 halaman) dan halaman tanpa token identik dengan GAS lokal; approve L1 dan L2 lewat `google.script.run` identik (jawaban dan isi akhir 24 sheet); halaman berjalan di happy-dom tanpa galat JavaScript; `listTokens`, `generateTokensForAllUsers`, dan `resetTransaksiSaja` ditolak.
 
 ## Jalur tulis
 

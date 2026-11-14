@@ -29,7 +29,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
-import { buatLayanan, buatPermintaanPost, dataDariCermin } from '../../workers/bersama/gas-layanan.js';
+import { buatLayanan, buatPermintaanPost, buatPermintaanGet, hasilRun, dataDariCermin } from '../../workers/bersama/gas-layanan.js';
+import { kompilasiFolder, kodePasangTemplat } from './templat-gas.mjs';
 import { buatHost } from '../../workers/bersama/gas-host.js';
 
 export async function muatCermin(sql, skema, tidakDimuat = []) {
@@ -39,9 +40,9 @@ export async function muatCermin(sql, skema, tidakDimuat = []) {
 
 export function bacaKodeGas(folderGas) {
   const manifest = JSON.parse(fs.readFileSync(path.join(folderGas, 'appsscript.json'), 'utf8'));
-  const berkas = fs.readdirSync(folderGas).filter((f) => /\.(js|gs)$/.test(f)).sort((a, b) => a.localeCompare(b))
+  const baca = (re) => fs.readdirSync(folderGas).filter((f) => re.test(f)).sort((a, b) => a.localeCompare(b))
     .map((nama) => ({ nama, isi: fs.readFileSync(path.join(folderGas, nama), 'utf8') }));
-  return { zonaSkrip: manifest.timeZone || 'Etc/UTC', berkas };
+  return { zonaSkrip: manifest.timeZone || 'Etc/UTC', berkas: baca(/\.(js|gs)$/), html: baca(/\.html$/) };
 }
 
 const PASANG = `Object.assign(globalThis, (${buatLayanan.toString()})(JSON.parse(__D), __host));
@@ -49,6 +50,20 @@ globalThis.__buatPermintaanPost = ${buatPermintaanPost.toString()};
 globalThis.__panggilApi = function (isiJson) {
   var keluar = doPost(__buatPermintaanPost(isiJson));
   return JSON.stringify({ isi: keluar && typeof keluar.getContent === 'function' ? keluar.getContent() : null, catatan: __CATAT, ekspor: __ekspor() });
+};
+globalThis.__buatPermintaanGet = ${buatPermintaanGet.toString()};
+globalThis.__hasilRun = ${hasilRun.toString()};
+// Satu halaman web: doGet dengan query string, seperti membuka /exec?token=…&page=….
+globalThis.__panggilWeb = function (qs) {
+  var keluar = doGet(__buatPermintaanGet(qs));
+  var h = keluar && typeof keluar.getContent === 'function' ? keluar : null;
+  return JSON.stringify({ isi: h ? h.getContent() : null, judul: h ? h.getTitle() : '', meta: h ? h.getMetaTags() : [], catatan: __CATAT, ekspor: __ekspor() });
+};
+// Satu panggilan google.script.run: fungsi global dengan argumen JSON; galat diteruskan sebagai pesan.
+globalThis.__panggilFungsi = function (nama, argsJson) {
+  var hasil, galat = null;
+  try { hasil = __hasilRun(globalThis[nama].apply(null, JSON.parse(argsJson))); } catch (e) { galat = String(e && e.message || e); }
+  return JSON.stringify({ hasil: hasil === undefined ? null : hasil, galat: galat, catatan: __CATAT, ekspor: __ekspor() });
 };`;
 
 // Terapkan hasil __ekspor() ke data cermin, seperti yang dilakukan penyimpanan Worker (public.cermin_tulis):
@@ -68,13 +83,17 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
   const awalan = ketat ? '"use strict";' : '';
   const skrip = kode.berkas.map((b) => new vm.Script(awalan + b.isi, { filename: b.nama }));
   const pasang = new vm.Script(PASANG, { filename: 'gas-layanan.js' });
+  // Template web dikompilasi sekali dengan pengompilasi yang sama dengan bundel Worker.
+  const web = kompilasiFolder(kode.html || []);
+  if (!data.html) data.html = web.html;
+  const pasangTemplat = new vm.Script((ketat ? '"use strict";' : '') + kodePasangTemplat(web, '__pasangTemplat'), { filename: 'templat-gas.js' });
   const host = buatHost();
   let dataJson = JSON.stringify(data);
   let urutan = null;
   const konteksBaru = () => {
     const ctx = vm.createContext({ __D: dataJson, __host: host });
     pasang.runInContext(ctx);
-    if (urutan) { for (const i of urutan) skrip[i].runInContext(ctx); return ctx; }
+    if (urutan) { for (const i of urutan) skrip[i].runInContext(ctx); pasangTemplat.runInContext(ctx); return ctx; }
     let antre = skrip.map((_, i) => i);
     const jadi = [];
     while (antre.length) {
@@ -89,6 +108,7 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
       antre = gagal.map((g) => g.i);
     }
     urutan = jadi;
+    pasangTemplat.runInContext(ctx);
     return ctx;
   };
   return {
@@ -100,12 +120,13 @@ export function siapkanKonteks({ kode, data, ketat = true }) {
 
 // sesi: perubahan setiap panggilan diterapkan ke data di memori (tidak pernah ke database), jadi urutan aksi
 // seperti buat WO → kirim kerja → approve bisa dijalankan berurutan.
-export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [], sesi = false }) {
+export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tidakDimuat = [], sesi = false, urlWeb = '' }) {
   // Sama dengan Worker: mesin UTC, zona skrip dibawa Date tiruan.
   process.env.TZ = 'UTC';
   const kode = bacaKodeGas(folderGas);
   const cermin = await muatCermin(sql, skema, tidakDimuat);
   const data = dataDariCermin(cermin, kode.zonaSkrip);
+  if (urlWeb) data.urlWeb = urlWeb;
   const k = siapkanKonteks({ kode, data, ketat });
   return {
     berkas: kode.berkas.length,
@@ -117,6 +138,20 @@ export async function siapkanGasLokal({ folderGas, sql, skema, ketat = true, tid
       const hasil = JSON.parse(vm.runInContext('__panggilApi', ctx)(JSON.stringify({ token, action, op_id: opId, data: isi })));
       if (sesi && Object.keys(hasil.ekspor).length) k.gantiData(terapkanEkspor(data, hasil.ekspor));
       return { jawaban: hasil.isi === null ? null : JSON.parse(hasil.isi), catatan: hasil.catatan, ekspor: hasil.ekspor, ms: Date.now() - mulai };
+    },
+    // Halaman web: query string seperti 'token=…&page=approvals'.
+    web(qs) {
+      const ctx = k.konteksBaru();
+      const hasil = JSON.parse(vm.runInContext('__panggilWeb', ctx)(String(qs || '')));
+      if (sesi && Object.keys(hasil.ekspor).length) k.gantiData(terapkanEkspor(data, hasil.ekspor));
+      return hasil;
+    },
+    // google.script.run.<nama>(...args)
+    jalankan(nama, args = []) {
+      const ctx = k.konteksBaru();
+      const hasil = JSON.parse(vm.runInContext('__panggilFungsi', ctx)(nama, JSON.stringify(args)));
+      if (sesi && Object.keys(hasil.ekspor).length) k.gantiData(terapkanEkspor(data, hasil.ekspor));
+      return hasil;
     },
   };
 }
