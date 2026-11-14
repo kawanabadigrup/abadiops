@@ -42,7 +42,7 @@ Yang dikerjakan tombol secara otomatis:
    - **Selisih 0:** saklar → `supabase`. Pemicu terjadwal GAS berhenti dan dijalankan Worker, cermin balik mulai, dan antrean HP terkirim ke Supabase.
    - **Selisih bukan 0:** saklar kembali ke `gas`. Tidak ada yang hilang, karena belum ada yang ditulis di Supabase. Panel menampilkan sheet yang berbeda.
 
-**Urutan rumah** belum diputuskan. Keputusan 29 Okt: serentak. Usulan 14 Nov: bertahap, BUPR → KMB Projek → KMB V2 → SUM, masing-masing dengan jam mulai sendiri. Menunggu keputusan Gabriel.
+**Urutan rumah: bertahap** (keputusan Gabriel 14 Nov, menggantikan go-live serentak 29 Okt): BUPR → KMB Projek → KMB V2 → SUM. Setiap rumah punya jam mulai sendiri, jadi kalau ada masalah dampaknya hanya ke satu rumah.
 
 ## Jaring pengaman: kembali ke GAS (`supabase` → `gas`)
 
