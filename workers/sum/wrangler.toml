@@ -58,4 +58,6 @@ services = [
 [env.staging.vars]
 RUMAH = "sum"
 GAS_URL = ""
-SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
+# Ruang uji di Gedung 1 (docs/SAKLAR.md, 14 Nov): Worker uji membaca/menulis skema uji_*; cermin asli terkunci.
+SUPABASE_URL = "https://sptgqsjgszwbreikxdph.supabase.co"
+SKEMA_AWALAN = "uji_"

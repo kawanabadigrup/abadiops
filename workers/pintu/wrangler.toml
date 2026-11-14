@@ -66,8 +66,10 @@ bindings = [
 # Staging tidak punya GAS sungguhan; Gedung 2 satu-satunya sumber data, jadi pusat admin boleh menulis tanpa
 # menunggu saklar "supabase" (src/admin-cermin.js izinTulis). Produksi tidak memakai variabel ini.
 LINGKUNGAN = "staging"
-SUPABASE_URL = "https://dnnqrslftndcbmnvuveb.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_HgQd9sXhK3-CrFyUId-LEw_q_ah2S0O"
+# Ruang uji di Gedung 1 (docs/SAKLAR.md, 14 Nov): Worker uji membaca/menulis skema uji_*; cermin asli terkunci.
+SUPABASE_URL = "https://sptgqsjgszwbreikxdph.supabase.co"
+SKEMA_AWALAN = "uji_"
+SUPABASE_ANON_KEY = "sb_publishable_PoWC64yv25bZizBrTL79vw_CuNQwhp3"
 RUMAH = [
   { kode = "kmbprojek", nama = "KMB Projek (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/kmbprojek", alamat = "https://abadiops-kmbprojek-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-kmbprojek-staging.kawanabadigrup.workers.dev/web" },
   { kode = "sum", nama = "SUM (Staging)", gas = "https://abadiops-gas-tiruan.kawanabadigrup.workers.dev/sum", alamat = "https://abadiops-sum-staging.kawanabadigrup.workers.dev/", web = "https://abadiops-sum-staging.kawanabadigrup.workers.dev/web" },

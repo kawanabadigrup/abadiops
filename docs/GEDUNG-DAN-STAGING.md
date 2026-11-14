@@ -4,6 +4,13 @@ Berlaku untuk semua orang dan semua AI di repo ini. Ditulis 30 Okt 2026 atas per
 
 **Baca dokumen ini sebelum menyentuh Supabase, staging, panel saklar, atau rumah baru.**
 
+> **Keadaan terbaru 14 Nov 2026 (keputusan Gabriel; `docs/SAKLAR.md`, `docs/KEPUTUSAN.md`) — mengalahkan uraian Gedung 2 di bawah:**
+> - **Gedung 2 tidak dipakai lagi.** Proyek "Stagging" dipindah ke organisasi Supabase gratis terpisah ("kawanabadigrup staging") dan dibiarkan apa adanya.
+> - **Uji dilakukan di Gedung 1** (paket Pro, mesin Micro, disk 8 GB; batas 500 MB tidak berlaku lagi) pada **ruang uji**: skema salinan `uji_<skema>` yang disegarkan dengan `SELECT public.cermin_salin_ke_uji('<skema>')` (`db/bersama/ruang_uji.sql`).
+> - **Cermin asli terkunci di database:** `cermin_tulis` menolak skema asli (`TERKUNCI`, HTTP 423) sampai tombol mulai migrasi rumah itu membuka izin; `uji_*` selalu boleh ditulis.
+> - **Worker `abadiops-*-staging` = Worker uji:** `SUPABASE_URL` Gedung 1, `SKEMA_AWALAN = "uji_"`, dan kunci rahasia khusus `worker_uji` (bisa dicabut tanpa mengganggu produksi).
+> - Uraian Gedung 2 di bawah adalah sejarah (30 Okt–14 Nov).
+
 ## Versi singkat
 
 - **Gedung** = satu project Supabase.
