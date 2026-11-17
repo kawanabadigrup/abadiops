@@ -168,9 +168,21 @@ async function kenaliRumah(token, env) {
     daftarRumah(env).filter((r) => !adalahLatihan(r.kode))
       .map((r) => periksaSatuRumah(r, token, petaSaklar[r.kode] || 'gas', env))
   );
-  const cocok = hasil.filter((h) => h.cocok);
+  let cocok = hasil.filter((h) => h.cocok);
   const gagal = hasil.filter((h) => h.gagal);
   if (gagal.length) console.log('pintu: rumah tidak menjawab: ' + gagal.map((h) => `${h.rumah.kode} (${h.err})`).join(', '));
+
+  // Fallback: Bila tidak cocok di rumah produksi mana pun, periksa ke rumah latihan
+  if (cocok.length === 0) {
+    const hasilLatihan = await Promise.all(
+      daftarRumah(env).filter((r) => adalahLatihan(r.kode))
+        .map((r) => periksaSatuRumah(r, token, petaSaklar[r.kode] || 'gas', env))
+    );
+    const cocokLatihan = hasilLatihan.filter((h) => h.cocok);
+    if (cocokLatihan.length === 1) {
+      cocok = cocokLatihan;
+    }
+  }
 
   if (cocok.length > 1) {
     console.log(`pintu: TOKEN KEMBAR ${token.slice(0, 4)}… di ${cocok.map((h) => h.rumah.kode).join(' + ')}`);
