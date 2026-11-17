@@ -59,6 +59,14 @@ async function layani(request, env, ctx) {
   if (url.pathname === '/gas-tiruan' && (PROFIL_RUMAH[env.RUMAH] || {}).latihan) return gasTiruanLatihan(request, env);
   if (url.pathname === '/web/run') return tanganiRun(request, env, url, ctx);
   if (url.pathname === '/web' || url.pathname === '/web/') return tanganiWeb(request, env, url, ctx);
+
+  // Rute frontend modern (Next.js) via Smart Gateway (Opsi A) bila ORIGIN_WEB dikonfigurasi
+  const adalahRuteModern = RUTE_FRONTEND_MODERN.some((r) => url.pathname === r || url.pathname.startsWith(r + '/'));
+  if (adalahRuteModern && (env.ORIGIN_WEB || env.NEXTJS_ORIGIN || env.WEB_ORIGIN)) {
+    const jawabanProxy = await proxyKeOriginWeb(request, env, url);
+    if (jawabanProxy) return jawabanProxy;
+  }
+
   // File PWA rumah ([assets] Worker rumah). Akar folder → index.html, disajikan langsung tanpa redirect.
   if (url.pathname.endsWith('/')) return env.ASSETS.fetch(new Request(new URL(url.pathname + 'index.html', url), request));
   return env.ASSETS.fetch(request);
@@ -241,6 +249,55 @@ async function tanganiApi(request, env, url, ctx) {
   return jawab({ success: false, error: `Aksi ${aksi || '?'} belum berjalan di Worker, dan lingkungan ini tidak punya GAS.` }, 'tidak-ada', env);
 }
 
+// ── Opsi A: Smart Gateway / Reverse Proxy ke Origin Frontend Modern (Next.js) ──
+const RUTE_FRONTEND_MODERN = [
+  '/_next',
+  '/monitoring',
+  '/approval',
+  '/performa',
+  '/lapangan',
+  '/wo',
+  '/antrean',
+  '/admin',
+  '/masuk',
+];
+
+async function proxyKeOriginWeb(request, env, url, jalurKustom) {
+  const origin = env.ORIGIN_WEB || env.NEXTJS_ORIGIN || env.WEB_ORIGIN;
+  if (!origin) return null;
+  try {
+    const targetUrl = new URL(jalurKustom || (url.pathname + url.search), origin);
+    const headers = new Headers(request.headers);
+    headers.set('X-Forwarded-Host', url.host);
+    headers.set('X-Forwarded-Proto', url.protocol.replace(':', ''));
+    headers.set('X-Abadi-Rumah', env.RUMAH || '');
+    headers.set('X-Abadi-Jalur', 'nextjs-proxy');
+
+    const init = {
+      method: request.method,
+      headers,
+      redirect: 'manual',
+    };
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      init.body = request.body;
+      init.duplex = 'half';
+    }
+
+    const res = await fetch(targetUrl.toString(), init);
+    const resHeaders = new Headers(res.headers);
+    resHeaders.set('X-Abadi-Rumah', env.RUMAH || '');
+    resHeaders.set('X-Abadi-Jalur', 'nextjs-proxy');
+    return new Response(res.body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: resHeaders,
+    });
+  } catch (err) {
+    console.error('proxyKeOriginWeb gagal:', err);
+    return null;
+  }
+}
+
 // ── MAR Web ────────────────────────────────────────────────────────────────
 // Halaman web GAS asli: doGet beserta templatenya. Disajikan di sini hanya bila Supabase sumber datanya
 // (halaman web juga menulis, misalnya kolom yang ditambahkan doGet); selain itu diarahkan ke web app GAS.
@@ -250,6 +307,14 @@ async function tanganiWeb(request, env, url, ctx) {
   const saklar = await bacaStatusSaklar(env);
   if (POSISI_PERALIHAN.has(saklar)) return halamanPeralihan(env);
   if (!bolehTulis(saklar, env)) return Response.redirect(String(env.GAS_URL) + url.search, 302);
+
+  // Opsi A (Smart Gateway): Jika saklar Supabase dan origin Next.js tersedia, sajikan UI modern
+  if (env.ORIGIN_WEB || env.NEXTJS_ORIGIN || env.WEB_ORIGIN) {
+    const token = url.searchParams.get('token');
+    const jalurNext = token ? `/masuk?token=${encodeURIComponent(token)}` : `/monitoring${url.search}`;
+    const jawabanProxy = await proxyKeOriginWeb(request, env, url, jalurNext);
+    if (jawabanProxy) return jawabanProxy;
+  }
   const h = await jalankanDanSimpan(env, p, url, `web:${url.searchParams.get('page') || ''}`, { jarang: sheetJarang(p, '') }, (G) => {
     const k = G.doGet(buatPermintaanGet(url.search));
     if (!k || typeof k.getContent !== 'function') throw new Error('doGet tidak mengembalikan halaman');

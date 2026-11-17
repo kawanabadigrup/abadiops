@@ -50,6 +50,10 @@ workers/*/gas/
 
 # Konfigurasi & workspace AI agent lokal (Antigravity / OpenCode / dsb.)
 .agent/
-opencode.json*
+opencode.json
+opencode.jsonc
+abadiops.env
+tools/mcp/
+
 
 

@@ -626,7 +626,11 @@ function flushOutbox() {
 function pullWos() {
   return api('pull_my_wos').then(function(r) {
     if (!r.success) return;
-    S.wos = (r.result && r.result.wos) || [];
+    var rawWos = (r.result && r.result.wos) || [];
+    S.wos = rawWos.filter(function(w) {
+      var s = String((w && w.status) || '').toLowerCase().trim();
+      return s !== 'cancelled' && s !== 'canceled';
+    });
     return kvSet('wos', S.wos);
   });
 }
@@ -1750,6 +1754,11 @@ function majukanStatusLokal(op) {
   };
   var baru = lanjut[op.action];
   if (!baru) return;
+  if (op.action === 'cancel_wo') {
+    S.wos = S.wos.filter(function(w) { return String(w.id) !== String(op.wo_id); });
+    kvSet('wos', S.wos);
+    return;
+  }
   for (var i = 0; i < S.wos.length; i++) {
     if (String(S.wos[i].id) === String(op.wo_id)) { S.wos[i].status = baru; break; }
   }
@@ -1878,9 +1887,10 @@ function switchMechTab(t) { S.mechTab = t; renderAll(); }
 
 /** Kelompokkan status WO ke tab mekanik. */
 function mechGroupOf(wo) {
-  var st = String(wo.status || '');
+  var st = String((wo && wo.status) || '').toLowerCase().trim();
   if (st === 'approved') return 'done';
-  if (st === 'rejected' || st === 'cancelled') return 'done';
+  if (st === 'rejected') return 'done';
+  if (st === 'cancelled' || st === 'canceled') return null;
   if (st === 'pending_supervisor' || st === 'pending_superintendent') return 'pending';
   return 'assigned';   // pending_mechanic_work / in_progress / pending_transfer / created
 }

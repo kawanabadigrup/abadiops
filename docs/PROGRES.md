@@ -12,9 +12,44 @@ Formatnya:
 
 ---
 
+### 2026-11-17 · Raka (+ Antigravity) · bersama
+- Berubah:
+  - **Smart Gateway / Reverse Proxy ke Next.js Modern UI (Opsi A)**:
+    - Di `workers/bersama/gas-rumah.js`: menambahkan helper `proxyKeOriginWeb` dan deteksi `ORIGIN_WEB` / `NEXTJS_ORIGIN` / `WEB_ORIGIN`.
+    - Pada `tanganiWeb()`: bila saklar `supabase` dan origin Next.js aktif, request web dialihkan/di-proxy ke UI modern Next.js (`/masuk?token=...` bila membawa token, atau `/monitoring`) dengan fallback aman ke `G.doGet()` bila origin belum aktif.
+    - Pada `layani()`: rute modern Next.js (`/_next`, `/monitoring`, `/approval`, `/performa`, `/lapangan`, `/wo`, `/antrean`, `/admin`, `/masuk`) di-proxy ke origin Next.js bila `ORIGIN_WEB` aktif, tanpa mengganggu aset PWA (`/index.html`, `/app.js`, dll.) maupun API edge (`/api`, `/api/sehat`).
+  - Di `src/app/masuk/page.tsx`: mendukung penangkapan parameter `?token=...` dari URL pintu selain `?t=...` agar serah terima token instan.
+  - Pemeriksaan dan audit kepatuhan seluruh sistem terhadap `docs/SERAH-TERIMA-2026-11-16.md`, `docs/SIAP-MULAI.md`, dan batas saklar produksi.
+- Belum selesai / berikutnya: Pasang env `ORIGIN_WEB` di Worker (staging/prod) mengarah ke Cloudflare Tunnel Next.js, verifikasi tampilan di browser.
+
 ### 2026-11-16 (siang) · Claude (+ Gabriel: "dua sandi") · pintu
 - Berubah: sandi kedua untuk Mulai/Kembali rumah asli (`e21632a`: server `verifikasiSandiMigrasiAsli`, kolom sandi di jendela konfirmasi, uji `tests/sandiMigrasi.test.ts` 7/7). Pintu produksi `c87e894d` (1% → diff panel hanya perubahan yang dimaksud → 100%), lalu secret `MIGRASI_ASLI_SECRET` dan `PANEL_SAKLAR_SECRET` baru → `2e500a8b`; jalur publik sama. Sandi di `abadiops.env` (`PANEL_SAKLAR_SANDI_PRODUKSI`, `PANEL_SAKLAR_SANDI_MIGRASI_ASLI`); sandi lama tidak berlaku.
 - Belum selesai / berikutnya: Gabriel mencoba masuk panel dengan sandi baru.
+
+### 2026-11-16 (siang) · Raka (+ Antigravity) · ketiga rumah (KMB V2, SUM, KMB Projek)
+- Berubah:
+  - **Pembaruan Script ID Google Apps Script**:
+    - KMB V2 (`kmbtra`): `1R00qlN-iY_Q3D_2qyejPrMRuAIYqbvGEieeeqNIe_0tfBqxQmsSBtYcQ` (berhasil di-clone ke `gas-backup/kmb-v2/` 118 berkas, bundel Worker `workers/kmb/gas/gas-kamar.js` sukses).
+    - SUM V2 (`sum`): `1OUi63MpheIvHD59pRz2hfSuYBWfWqpxXapT8Lqkg7CxCMkm6OSVNCL7O` (diperbarui di `config/rumah.json` & `gas-backup/sum/.clasp.json`, bundel Worker `workers/sum/gas/gas-kamar.js` sukses).
+    - KMB Projek (`kmbprojek`): `1VwXbYVgi0F2ePNHo1ParHZNe3DOwoDKyuOCfiTI9u_-mTXZcPud0-OZD` (diperbarui di `config/rumah.json` & `gas-backup/kmb-projek/.clasp.json`, bundel Worker `workers/kmbprojek/gas/gas-kamar.js` sukses).
+  - Ketiga script baru terverifikasi memuat tambalan `_TutupGas.js` dan `_PenjagaRun.js`.
+- Belum selesai / berikutnya: Catatan: deployment Web App ketiga script baru saat ini masih berstatus `@HEAD` (HTTP 401 bila di-curl publik); perlu dibuat New Versioned Deployment di editor GAS dengan akses "Anyone" bila URL `/exec`-nya ingin diarahkan ke script baru.
+
+### 2026-11-16 · Raka (+ OpenCode) · bersama
+- Berubah: MCP lokal `project-reader` ditambahkan untuk indeks project, pencarian kode, dan baca rentang baris dengan keluaran ringkas.
+- Belum selesai / berikutnya: uji koneksi MCP dari `/mcps` atau `opencode mcp list`.
+
+### 2026-11-16 (siang) · Raka (+ Antigravity) · SUM V2
+- Berubah:
+  - **Refactor UI Halaman Cancel WO (`gas-backup/sum/CancelWO.html`)**: Tampilan daftar WO yang dapat dibatalkan dirombak total menjadi model card modern responsif 1:1 mirip tampilan kartu di `Approval.html` (`.wo-grid`, `.wo-card` dengan border merah aksen, `.wo-header`, `.status-badge`, `.location-badge`, `.wo-section`, `.wo-detail-row`, dan tombol aksi `.btn-cancel-wo`). Modal konfirmasi pembatalan diselaraskan dengan `.modal-backdrop` & `.modal` di Approvals lengkap dengan warning danger-box dan textarea alasan.
+  - **Penanganan Galat di `CancelWO.html`**: Logika `muat()` dan `konfirmasi()` diperbaiki agar dapat membaca pesan galat baik berbentuk objek `{code, message}` maupun string secara presisi, mencegah tampilan fallback keliru "Daftar gagal dimuat.".
+  - **Sinkronisasi WO Batal ke Tampilan Mekanik (PWA & Web)**:
+    - Di `pwa/sum/app.js`: fungsi `mechGroupOf()` mengembalikan `null` untuk WO berstatus `cancelled`/`canceled` sehingga tidak lagi nyasar ke tab 'Done'. Fungsi `majukanStatusLokal(op)` langsung menghapus WO terkait dari `S.wos` saat aksi `cancel_wo` dieksekusi, dan `pullWos()` menyaring WO yang dibatalkan.
+    - Di `gas-backup/sum/ApiService.js`: aksi server `pull_my_wos` mengecualikan WO dengan status `cancelled` / `canceled`.
+    - Di `gas-backup/sum/MechanicService.js`: query `getMyAssignedWOs` memastikan WO `cancelled` tidak ditarik ke tampilan web mekanik.
+  - **Bundel & Deploy Staging**: Bundel GAS SUM di-generate ulang via `tools/kembar/bundel-gas.mjs --kamar=sum` ke `workers/sum/gas/gas-kamar.js`, diverifikasi sintaks dan template-nya, lalu di-deploy ke worker staging `abadiops-sum-staging` (`Version ID: fd000fd5-b948-4116-936e-1d3342f1a1fd`).
+- Belum selesai / berikutnya: Verifikasi langsung di browser dengan token foreman/approver valid di staging.
+
 ### 2026-11-16 (pagi) · Claude (+ Gabriel: "habis ini saya hands off, dilanjutkan Raka") · keempat rumah
 - Berubah:
   - Rahasia GitHub `CERMIN_RUMAH_LATIHAN` dibuat (izin Gabriel): pelaksana Peralihan dari `main` "melayani 8 rumah" (4 asli + 4 latihan); keempat kartu latihan hijau.

@@ -11,7 +11,7 @@ export default function Masuk() {
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    const t = q.get('t');
+    const t = q.get('token') || q.get('t');
     if (t) setToken(t);
   }, []);
 
