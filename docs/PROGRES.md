@@ -14,6 +14,10 @@ Formatnya:
 
 ### 2026-11-17 · Raka (+ Antigravity) · bersama
 - Berubah:
+  - **Mode Latihan Pintu Masuk (`workers/pintu/public/index.html`)**:
+    - Menambahkan tombol hijau utama `🧪 Buka Aplikasi (Mode Latihan / Spreadsheet Salinan)` pada kartu pilihan setelah token dimasukkan.
+    - Tombol ini otomatis mengarahkan ke `j.alamat_rumah + '/?latihan=1#token=' + token`, sehingga pengguna dapat langsung menguji data spreadsheet salinan di Supabase Gedung 2 (`latihan_kmb_projek`) tanpa mengganggu operasional produksi.
+    - Worker pintu `abadiops-pintu` berhasil di-deploy langsung ke Cloudflare Workers.
   - **Smart Gateway / Reverse Proxy ke Next.js Modern UI (Opsi A)**:
     - Di `workers/bersama/gas-rumah.js`: menambahkan helper `proxyKeOriginWeb` dan deteksi `ORIGIN_WEB` / `NEXTJS_ORIGIN` / `WEB_ORIGIN`.
     - Pada `tanganiWeb()`: bila saklar `supabase` dan origin Next.js aktif, request web dialihkan/di-proxy ke UI modern Next.js (`/masuk?token=...` bila membawa token, atau `/monitoring`) dengan fallback aman ke `G.doGet()` bila origin belum aktif.

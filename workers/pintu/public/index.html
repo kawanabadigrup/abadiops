@@ -67,7 +67,8 @@
     <div id="pilih">
       <p id="salam"></p>
       <p id="salamRumah"></p>
-      <button type="button" id="tombolAplikasi">📱 Aplikasi PWA<span class="pilih-ket">untuk HP / lapangan (offline-first)</span></button>
+      <button type="button" id="tombolAplikasiLatihan" style="background:#047857;margin-top:10px;">🧪 Buka Aplikasi (Mode Latihan / Spreadsheet Salinan)<span class="pilih-ket">uji coba aman di database Supabase Gedung 2</span></button>
+      <button type="button" id="tombolAplikasi" class="kedua">📱 Aplikasi PWA (Produksi)<span class="pilih-ket">untuk HP / lapangan (offline-first)</span></button>
       <button type="button" class="kedua" id="tombolWeb">🖥️ Web Biasa<span class="pilih-ket">untuk laptop / desktop (menu lengkap)</span></button>
       <button type="button" class="tautan" id="tombolGanti">Bukan Anda? Ganti token</button>
     </div>
@@ -114,8 +115,16 @@
     document.getElementById('salam').textContent = 'Halo' + (j.nama ? ', ' + j.nama : '') + '!';
     document.getElementById('salamRumah').textContent = j.nama_rumah;
     
+    var tAplLat = document.getElementById('tombolAplikasiLatihan');
     var tApl = document.getElementById('tombolAplikasi');
     var tWeb = document.getElementById('tombolWeb');
+
+    tAplLat.onclick = function () {
+      try { localStorage.setItem(KUNCI_RUMAH, JSON.stringify({ alamat: j.alamat_rumah, nama: j.nama_rumah })); } catch (e) {}
+      tampil('Membuka aplikasi latihan ' + j.nama_rumah + ' (Supabase Gedung 2)…', 'ok');
+      var urlLat = j.alamat_rumah.replace(/\/?$/, '/?latihan=1') + '#token=' + encodeURIComponent(token);
+      location.replace(urlLat);
+    };
 
     tApl.onclick = function () {
       try { localStorage.setItem(KUNCI_RUMAH, JSON.stringify({ alamat: j.alamat_rumah, nama: j.nama_rumah })); } catch (e) {}
